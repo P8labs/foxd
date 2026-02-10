@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+/build
+/.svelte-kit
+/package
+.output
+.vercel
+.netlify
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary
+.tmp
+.cache
+.temp

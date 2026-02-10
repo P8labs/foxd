@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  foxd-daemon:
+    build: .
+    container_name: foxd-daemon
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - foxd-data:/data
+    environment:
+      - RUST_LOG=foxd_daemon=info
+      - FOXD_CONFIG=/app/config.toml
+      - FOXD_DB_PATH=/data/foxd.db
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  foxd-data:
+    driver: local

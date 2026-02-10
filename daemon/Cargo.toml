@@ -1,0 +1,75 @@
+[package]
+name = "foxd-daemon"
+version = "0.1.0"
+edition = "2021"
+authors = ["Fox Daemon Contributors"]
+description = "LAN monitoring daemon with packet capture and notifications"
+
+[lib]
+name = "foxd_daemon"
+path = "src/lib.rs"
+
+[[bin]]
+name = "foxd-daemon"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+tokio-util = "0.7"
+
+# HTTP server
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "sqlite", "macros", "migrate"] }
+
+# Packet capture
+pcap = "1.1"
+pnet = { version = "0.34", features = ["std"] }
+
+# Netlink for Linux neighbor table
+rtnetlink = "0.14"
+netlink-packet-route = "0.18"
+futures = "0.3"
+libc = "0.2"
+
+# HTTP client for notifications
+reqwest = { version = "0.11", features = ["json"] }
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+
+# Config
+config = "0.14"
+
+# Async channels
+async-channel = "2.1"
+
+# Network utilities
+ipnetwork = "0.20"
+mac_address = "1.1"
+
+[dev-dependencies]
+mockito = "1.2"
+tempfile = "3.8"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

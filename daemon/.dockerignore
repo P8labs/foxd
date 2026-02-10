@@ -1,0 +1,9 @@
+target/
+*.db
+*.db-journal
+config.toml
+.git/
+.gitignore
+README.md
+*.md
+.env

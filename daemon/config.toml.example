@@ -1,0 +1,65 @@
+# Fox Daemon Configuration
+# Copy this file to config.toml and customize for your environment
+
+[daemon]
+# Network interface to monitor (e.g., eth0, wlan0, enp0s3)
+interface = "eth0"
+
+# Optional pcap capture filter (BPF syntax)
+# capture_filter = "arp or (udp port 67 or udp port 68)"
+
+# How often to check neighbor table (seconds)
+neighbor_check_interval_secs = 60
+
+# How long before marking a device as offline (seconds)
+device_timeout_secs = 300
+
+[database]
+# SQLite database file path
+path = "./foxd.db"
+
+[api]
+# API server host
+host = "0.0.0.0"
+
+# API server port
+port = 8080
+
+# Notification channels
+# You can configure multiple channels of each type
+
+# Example: Telegram Bot
+[[notifications]]
+type = "telegram"
+bot_token = "YOUR_BOT_TOKEN_HERE"
+chat_id = "YOUR_CHAT_ID_HERE"
+
+# Example: ntfy.sh
+[[notifications]]
+type = "ntfy"
+server_url = "https://ntfy.sh"
+topic = "foxd-lan-monitor"
+# Optional authentication token
+# token = "tk_YOUR_TOKEN_HERE"
+
+# Example: Custom Webhook
+[[notifications]]
+type = "webhook"
+url = "https://example.com/webhook"
+# Optional custom headers
+# [notifications.headers]
+# Authorization = "Bearer YOUR_TOKEN"
+# X-Custom-Header = "value"
+
+# You can add multiple notification channels:
+
+# [[notifications]]
+# type = "telegram"
+# bot_token = "ANOTHER_BOT_TOKEN"
+# chat_id = "ANOTHER_CHAT_ID"
+
+# [[notifications]]
+# type = "ntfy"
+# server_url = "https://ntfy.example.com"
+# topic = "my-custom-topic"
+# token = "tk_secret"
