@@ -9,6 +9,8 @@
   let error = $state("");
   let filterStatus = $state<"all" | "online" | "offline">("all");
   let searchQuery = $state("");
+  let editingNickname = $state<string | null>(null);
+  let nicknameValue = $state("");
 
   async function loadDevices() {
     try {
@@ -20,6 +22,32 @@
       error = err instanceof Error ? err.message : "Failed to load devices";
     } finally {
       loading = false;
+    }
+  }
+
+  function startEditNickname(device: Device) {
+    editingNickname = device.mac_address;
+    nicknameValue = device.nickname || "";
+  }
+
+  function cancelEditNickname() {
+    editingNickname = null;
+    nicknameValue = "";
+  }
+
+  async function saveNickname(device: Device) {
+    try {
+      error = "";
+      await api.updateDeviceNickname(
+        device.mac_address,
+        nicknameValue.trim() || null,
+      );
+      await loadDevices();
+      editingNickname = null;
+      nicknameValue = "";
+    } catch (err) {
+      error =
+        err instanceof Error ? err.message : "Failed to update nickname";
     }
   }
 
@@ -42,7 +70,8 @@
         (d) =>
           d.mac_address.toLowerCase().includes(query) ||
           d.ip_address?.toLowerCase().includes(query) ||
-          d.hostname?.toLowerCase().includes(query),
+          d.hostname?.toLowerCase().includes(query) ||
+          d.nickname?.toLowerCase().includes(query),
       );
     }
 
@@ -106,11 +135,13 @@
           <thead>
             <tr>
               <th>Status</th>
+              <th>Device Name</th>
               <th>MAC Address</th>
               <th>IP Address</th>
               <th>Hostname</th>
               <th>First Seen</th>
               <th>Last Seen</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -125,6 +156,35 @@
                     {device.status}
                   </span>
                 </td>
+                <td>
+                  {#if editingNickname === device.mac_address}
+                    <div class="flex gap-2" style="align-items: center;">
+                      <input
+                        type="text"
+                        class="form-input"
+                        bind:value={nicknameValue}
+                        placeholder="Device name"
+                        style="width: 150px; padding: 0.375rem 0.75rem; font-size: 0.875rem;"
+                      />
+                      <button
+                        class="btn btn-sm btn-primary"
+                        onclick={() => saveNickname(device)}
+                      >
+                        Save
+                      </button>
+                      <button
+                        class="btn btn-sm btn-secondary"
+                        onclick={cancelEditNickname}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  {:else}
+                    <span style="font-weight: 500;">
+                      {device.nickname || "-"}
+                    </span>
+                  {/if}
+                </td>
                 <td class="text-mono">{device.mac_address}</td>
                 <td class="text-mono">{device.ip_address || "-"}</td>
                 <td>{device.hostname || "-"}</td>
@@ -134,6 +194,16 @@
                 <td class="text-muted" style="font-size: 0.8125rem"
                   >{new Date(device.last_seen).toLocaleString()}</td
                 >
+                <td>
+                  {#if editingNickname !== device.mac_address}
+                    <button
+                      class="btn btn-sm btn-secondary"
+                      onclick={() => startEditNickname(device)}
+                    >
+                      Edit Name
+                    </button>
+                  {/if}
+                </td>
               </tr>
             {/each}
           </tbody>

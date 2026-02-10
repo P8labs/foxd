@@ -5,6 +5,7 @@ export interface Device {
   mac_address: string;
   ip_address: string | null;
   hostname: string | null;
+  nickname: string | null;
   status: "online" | "offline" | "unknown";
   first_seen: string;
   last_seen: string;
@@ -98,6 +99,13 @@ export interface Config {
 export interface HealthResponse {
   status: string;
   service: string;
+  uptime_seconds: number;
+  system: {
+    cpu_usage_percent: number;
+    memory_usage_percent: number;
+    total_memory_mb: number;
+    used_memory_mb: number;
+  };
 }
 
 class ApiClient {
@@ -140,6 +148,19 @@ class ApiClient {
     return this.request<Device>(`/devices/${encodeURIComponent(macAddress)}`);
   }
 
+  async updateDeviceNickname(
+    macAddress: string,
+    nickname: string | null,
+  ): Promise<Device> {
+    return this.request<Device>(
+      `/devices/${encodeURIComponent(macAddress)}/nickname`,
+      {
+        method: "POST",
+        body: JSON.stringify({ nickname }),
+      },
+    );
+  }
+
   async getRules(): Promise<RulesResponse> {
     return this.request<RulesResponse>("/rules");
   }
@@ -180,6 +201,12 @@ class ApiClient {
 
   async getMetrics(): Promise<Metrics> {
     return this.request<Metrics>("/metrics");
+  }
+
+  async restartDaemon(): Promise<void> {
+    await this.request<{ message: string }>("/restart", {
+      method: "POST",
+    });
   }
 }
 

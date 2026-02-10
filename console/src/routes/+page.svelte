@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, formatUptime, type Metrics, type Device } from "$lib/api";
+  import {
+    api,
+    formatUptime,
+    type Metrics,
+    type Device,
+    type HealthResponse,
+  } from "$lib/api";
   import StatCard from "$lib/components/StatCard.svelte";
   import Loading from "$lib/components/Loading.svelte";
   import Alert from "$lib/components/Alert.svelte";
@@ -9,7 +15,9 @@
   let recentDevices: Device[] = $state([]);
   let loading = $state(true);
   let error = $state("");
-  let healthStatus = $state<{ status: string; service: string } | null>(null);
+  let success = $state("");
+  let healthStatus = $state<HealthResponse | null>(null);
+  let restarting = $state(false);
 
   async function loadData() {
     try {
@@ -32,6 +40,22 @@
     }
   }
 
+  async function handleRestart() {
+    if (!confirm("Are you sure you want to restart the daemon?")) return;
+
+    try {
+      restarting = true;
+      error = "";
+      await api.restartDaemon();
+      success = "Daemon restart initiated successfully";
+      setTimeout(() => (success = ""), 3000);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Failed to restart daemon";
+    } finally {
+      restarting = false;
+    }
+  }
+
   onMount(() => {
     loadData();
     const interval = setInterval(loadData, 30000);
@@ -48,13 +72,26 @@
     <h1 class="page-title">Dashboard</h1>
     <p class="page-subtitle">Overview of your network monitoring</p>
   </div>
-  {#if healthStatus}
-    <div class="status-indicator">
-      <span class="status-dot online"></span>
-      <span>System Online</span>
-    </div>
-  {/if}
+  <div class="flex gap-2">
+    {#if healthStatus}
+      <div class="status-indicator">
+        <span class="status-dot online"></span>
+        <span>System Online</span>
+      </div>
+    {/if}
+    <button
+      class="btn btn-primary"
+      onclick={handleRestart}
+      disabled={restarting}
+    >
+      {restarting ? "Restarting..." : "Restart Daemon"}
+    </button>
+  </div>
 </div>
+
+{#if success}
+  <Alert type="success" message={success} />
+{/if}
 
 {#if loading}
   <Loading message="Loading dashboard..." />
@@ -86,6 +123,61 @@
       subtitle="Running smoothly"
     />
   </div>
+
+  {#if healthStatus}
+    <div class="card">
+      <h3 class="card-title">System Health</h3>
+      <div style="margin-top: 1rem;">
+        <div class="flex justify-between items-center mb-3">
+          <span style="font-size: 0.875rem; color: var(--text); opacity: 0.6;"
+            >CPU Usage</span
+          >
+          <div class="flex items-center gap-2" style="min-width: 8rem;">
+            <div class="progress-bar" style="flex: 1;">
+              <div
+                class="progress-fill"
+                style="width: {healthStatus.system.cpu_usage_percent}%; background-color: {healthStatus
+                  .system.cpu_usage_percent > 80
+                  ? 'var(--danger)'
+                  : 'var(--success)'};"
+              ></div>
+            </div>
+            <span style="font-weight: 600;"
+              >{healthStatus.system.cpu_usage_percent}%</span
+            >
+          </div>
+        </div>
+        <div class="flex justify-between items-center mb-3">
+          <span style="font-size: 0.875rem; color: var(--text); opacity: 0.6;"
+            >Memory Usage</span
+          >
+          <div class="flex items-center gap-2" style="min-width: 8rem;">
+            <div class="progress-bar" style="flex: 1;">
+              <div
+                class="progress-fill"
+                style="width: {healthStatus.system.memory_usage_percent}%; background-color: {healthStatus
+                  .system.memory_usage_percent > 80
+                  ? 'var(--danger)'
+                  : 'var(--success)'};"
+              ></div>
+            </div>
+            <span style="font-weight: 600;"
+              >{healthStatus.system.memory_usage_percent}%</span
+            >
+          </div>
+        </div>
+        <div class="flex justify-between items-center">
+          <span style="font-size: 0.875rem; color: var(--text); opacity: 0.6;"
+            >Memory</span
+          >
+          <span style="font-weight: 600;"
+            >{healthStatus.system.used_memory_mb} MB / {healthStatus.system
+              .total_memory_mb} MB</span
+          >
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <div class="stats-grid">
     <div class="card">

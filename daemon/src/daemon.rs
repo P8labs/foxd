@@ -256,6 +256,7 @@ impl Daemon {
             mac_address: mac.to_string(),
             ip_address: ip.map(|i| i.to_string()),
             hostname: None,
+            nickname: existing_device.as_ref().and_then(|d| d.nickname.clone()),
             vendor: None,
             first_seen: existing_device
                 .as_ref()

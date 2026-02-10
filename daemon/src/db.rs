@@ -40,6 +40,7 @@ impl Database {
                 mac_address TEXT NOT NULL UNIQUE,
                 ip_address TEXT,
                 hostname TEXT,
+                nickname TEXT,
                 vendor TEXT,
                 first_seen TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
@@ -96,8 +97,8 @@ impl Database {
 
         let result = sqlx::query(
             r#"
-            INSERT INTO devices (mac_address, ip_address, hostname, vendor, first_seen, last_seen, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO devices (mac_address, ip_address, hostname, nickname, vendor, first_seen, last_seen, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(mac_address) DO UPDATE SET
                 ip_address = excluded.ip_address,
                 hostname = excluded.hostname,
@@ -110,6 +111,7 @@ impl Database {
         .bind(&device.mac_address)
         .bind(&device.ip_address)
         .bind(&device.hostname)
+        .bind(&device.nickname)
         .bind(&device.vendor)
         .bind(&first_seen)
         .bind(&last_seen)
@@ -123,7 +125,7 @@ impl Database {
     pub async fn get_device_by_mac(&self, mac: &str) -> Result<Option<Device>> {
         let row = sqlx::query(
             r#"
-            SELECT id, mac_address, ip_address, hostname, vendor, first_seen, last_seen, status
+            SELECT id, mac_address, ip_address, hostname, nickname, vendor, first_seen, last_seen, status
             FROM devices
             WHERE mac_address = ?
             "#,
@@ -141,7 +143,7 @@ impl Database {
     pub async fn get_all_devices(&self) -> Result<Vec<Device>> {
         let rows = sqlx::query(
             r#"
-            SELECT id, mac_address, ip_address, hostname, vendor, first_seen, last_seen, status
+            SELECT id, mac_address, ip_address, hostname, nickname, vendor, first_seen, last_seen, status
             FROM devices
             ORDER BY last_seen DESC
             "#,
@@ -158,7 +160,7 @@ impl Database {
         let status_str = status.to_string();
         let rows = sqlx::query(
             r#"
-            SELECT id, mac_address, ip_address, hostname, vendor, first_seen, last_seen, status
+            SELECT id, mac_address, ip_address, hostname, nickname, vendor, first_seen, last_seen, status
             FROM devices
             WHERE status = ?
             ORDER BY last_seen DESC
@@ -193,6 +195,22 @@ impl Database {
         Ok(())
     }
 
+    pub async fn update_device_nickname(&self, mac: &str, nickname: Option<String>) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE devices
+            SET nickname = ?
+            WHERE mac_address = ?
+            "#,
+        )
+        .bind(&nickname)
+        .bind(mac)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     fn row_to_device(&self, row: sqlx::sqlite::SqliteRow) -> Result<Device> {
         let status_str: String = row.get("status");
         let status = match status_str.as_str() {
@@ -209,6 +227,7 @@ impl Database {
             mac_address: row.get("mac_address"),
             ip_address: row.get("ip_address"),
             hostname: row.get("hostname"),
+            nickname: row.get("nickname"),
             vendor: row.get("vendor"),
             first_seen: chrono::DateTime::parse_from_rfc3339(&first_seen_str)
                 .map_err(|e| DaemonError::Database(sqlx::Error::Decode(Box::new(e))))?

@@ -15,8 +15,8 @@ use crate::daemon::Daemon;
 use crate::db::Database;
 use crate::errors::Result;
 use crate::models::{
-    Config, ConfigUpdateRequest, Device, DeviceStatus, DevicesResponse, Metrics, Rule, RuleRequest,
-    RulesResponse, SuccessResponse,
+    Config, ConfigUpdateRequest, Device, DeviceNicknameRequest, DeviceStatus, DevicesResponse,
+    Metrics, Rule, RuleRequest, RulesResponse, SuccessResponse,
 };
 
 #[derive(Clone)]
@@ -43,6 +43,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/health", get(health_check))
         .route("/devices", get(get_devices))
         .route("/devices/:mac", get(get_device))
+        .route("/devices/:mac/nickname", post(update_device_nickname))
         .route("/rules", get(get_rules))
         .route("/rules", post(create_rule))
         .route("/rules/:id", get(get_rule))
@@ -51,18 +52,41 @@ pub fn create_router(state: AppState) -> Router {
         .route("/config", get(get_config))
         .route("/config", post(update_config))
         .route("/metrics", get(get_metrics))
+        .route("/restart", post(restart_daemon))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
-async fn health_check() -> impl IntoResponse {
+async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
+    use sysinfo::System;
+
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    let uptime_seconds = state.start_time.elapsed().as_secs();
+    let total_memory = sys.total_memory();
+    let used_memory = sys.used_memory();
+    let memory_usage_percent = if total_memory > 0 {
+        (used_memory as f64 / total_memory as f64 * 100.0) as u32
+    } else {
+        0
+    };
+
+    let cpu_usage = sys.global_cpu_info().cpu_usage() as u32;
+
     Json(serde_json::json!({
         "status": "ok",
-        "service": "foxd-daemon"
+        "service": "foxd-daemon",
+        "uptime_seconds": uptime_seconds,
+        "system": {
+            "cpu_usage_percent": cpu_usage,
+            "memory_usage_percent": memory_usage_percent,
+            "total_memory_mb": total_memory / 1024 / 1024,
+            "used_memory_mb": used_memory / 1024 / 1024,
+        }
     }))
 }
 
-/// GET /devices - Get all devices
 async fn get_devices(State(state): State<AppState>) -> Result<Json<DevicesResponse>> {
     let devices = state.db.get_all_devices().await?;
     let count = devices.len();
@@ -70,7 +94,6 @@ async fn get_devices(State(state): State<AppState>) -> Result<Json<DevicesRespon
     Ok(Json(DevicesResponse { devices, count }))
 }
 
-/// GET /devices/:mac - Get specific device
 async fn get_device(
     State(state): State<AppState>,
     Path(mac): Path<String>,
@@ -83,7 +106,33 @@ async fn get_device(
     Ok(Json(device))
 }
 
-/// GET /rules - Get all rules
+async fn update_device_nickname(
+    State(state): State<AppState>,
+    Path(mac): Path<String>,
+    Json(request): Json<DeviceNicknameRequest>,
+) -> Result<Json<Device>> {
+    let _device =
+        state.db.get_device_by_mac(&mac).await?.ok_or_else(|| {
+            crate::errors::DaemonError::NotFound(format!("Device {} not found", mac))
+        })?;
+
+    state
+        .db
+        .update_device_nickname(&mac, request.nickname)
+        .await?;
+
+    let updated_device = state.db.get_device_by_mac(&mac).await?.ok_or_else(|| {
+        crate::errors::DaemonError::Internal("Failed to retrieve updated device".to_string())
+    })?;
+
+    info!(
+        "Updated nickname for device {}: {:?}",
+        mac, updated_device.nickname
+    );
+
+    Ok(Json(updated_device))
+}
+
 async fn get_rules(State(state): State<AppState>) -> Result<Json<RulesResponse>> {
     let rules = state.db.get_all_rules().await?;
     let count = rules.len();
@@ -91,7 +140,6 @@ async fn get_rules(State(state): State<AppState>) -> Result<Json<RulesResponse>>
     Ok(Json(RulesResponse { rules, count }))
 }
 
-/// GET /rules/:id - Get specific rule
 async fn get_rule(State(state): State<AppState>, Path(id): Path<i64>) -> Result<Json<Rule>> {
     let rule =
         state.db.get_rule_by_id(id).await?.ok_or_else(|| {
@@ -101,7 +149,6 @@ async fn get_rule(State(state): State<AppState>, Path(id): Path<i64>) -> Result<
     Ok(Json(rule))
 }
 
-/// POST /rules - Create new rule
 async fn create_rule(
     State(state): State<AppState>,
     Json(request): Json<RuleRequest>,
@@ -131,7 +178,6 @@ async fn create_rule(
     Ok(Json(created_rule))
 }
 
-/// POST /rules/:id - Update existing rule
 async fn update_rule(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -165,7 +211,6 @@ async fn update_rule(
     Ok(Json(updated_rule))
 }
 
-/// POST /rules/:id/delete - Delete rule
 async fn delete_rule(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -184,13 +229,11 @@ async fn delete_rule(
     }))
 }
 
-/// GET /config - Get current configuration
 async fn get_config(State(state): State<AppState>) -> Result<Json<Config>> {
     let config = state.config.read().await;
     Ok(Json(config.clone()))
 }
 
-/// POST /config - Update configuration
 async fn update_config(
     State(state): State<AppState>,
     Json(request): Json<ConfigUpdateRequest>,
@@ -219,7 +262,6 @@ async fn update_config(
     }))
 }
 
-/// GET /metrics - Get system metrics
 async fn get_metrics(State(state): State<AppState>) -> Result<Json<Metrics>> {
     let total_devices = state.db.get_total_device_count().await?;
     let online_devices = state
@@ -258,5 +300,18 @@ async fn get_metrics(State(state): State<AppState>) -> Result<Json<Metrics>> {
         packets_captured,
         notifications_sent,
         uptime_seconds,
+    }))
+}
+
+async fn restart_daemon() -> Result<Json<SuccessResponse>> {
+    info!("Restart requested via API");
+
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::process::exit(42); // Exit code 42 signals restart
+    });
+
+    Ok(Json(SuccessResponse {
+        message: "Daemon restart initiated".to_string(),
     }))
 }

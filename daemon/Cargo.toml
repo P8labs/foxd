@@ -55,6 +55,9 @@ thiserror = "1.0"
 # Time utilities
 chrono = { version = "0.4", features = ["serde"] }
 
+# System information
+sysinfo = "0.30"
+
 # Config
 config = "0.14"
 
