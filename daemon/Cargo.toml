@@ -42,7 +42,8 @@ futures = "0.3"
 libc = "0.2"
 
 # HTTP client for notifications
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json"], default-features = false }
+openssl = { version = "0.10", optional = true }
 
 # Logging and tracing
 tracing = "0.1"
@@ -71,6 +72,11 @@ mac_address = "1.1"
 # Embedded console
 rust-embed = "8"
 mime_guess = "2"
+
+[features]
+default = ["native-tls"]
+native-tls = ["reqwest/default-tls-native"]
+vendored-openssl = ["openssl/vendored", "reqwest/native-tls-vendored"]
 
 [dev-dependencies]
 mockito = "1.2"

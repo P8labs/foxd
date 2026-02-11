@@ -70,4 +70,5 @@ Bump major version (breaking changes):
 The release workflow builds for:
 
 - **Linux**: x86_64, ARM64, ARMv7
-- **Windows**: x86_64, ARM64
+
+**Note**: foxd is Linux-only as it relies on netlink and libpcap APIs that are specific to Linux.
