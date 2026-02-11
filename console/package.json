@@ -1,7 +1,7 @@
 {
   "name": "foxd-console",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Web dashboard for Fox Daemon LAN monitoring",
   "type": "module",
   "scripts": {
