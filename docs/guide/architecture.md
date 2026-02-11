@@ -72,10 +72,6 @@ foxd is a self-contained Rust daemon designed to passively monitor local area ne
 - Extracts MAC addresses, IP addresses, and hostnames
 - Forwards events to the event processor
 
-**Key Files:**
-
-- [daemon/src/daemon.rs](../daemon/src/daemon.rs) - Main capture loop
-
 ### 2. Netlink Monitor
 
 **Purpose:** Track Linux kernel's neighbor table for device state changes.
@@ -138,11 +134,6 @@ foxd is a self-contained Rust daemon designed to passively monitor local area ne
 - `notification_channels` - Channel configurations
 - `logs` - Structured log entries
 
-**Key Files:**
-
-- [daemon/src/db.rs](../daemon/src/db.rs) - Database abstraction
-- [daemon/src/models.rs](../daemon/src/models.rs) - Data models
-
 **Why SQLite?**
 
 - Zero configuration
@@ -194,10 +185,6 @@ foxd is a self-contained Rust daemon designed to passively monitor local area ne
 - Custom headers supported
 - Flexible integration with any HTTP endpoint
 
-**Key Files:**
-
-- [daemon/src/notifier.rs](../daemon/src/notifier.rs) - Notification logic
-
 ### 7. REST API
 
 **Purpose:** Provide programmatic access to daemon functionality.
@@ -211,10 +198,6 @@ foxd is a self-contained Rust daemon designed to passively monitor local area ne
 - Notification channel management (`/api/notifications/*`)
 - Configuration (`/api/config`)
 - Metrics and logs (`/api/metrics`, `/api/logs`)
-
-**Key Files:**
-
-- [daemon/src/api.rs](../daemon/src/api.rs) - API routes and handlers
 
 ### 8. Web Console
 
@@ -231,10 +214,6 @@ foxd is a self-contained Rust daemon designed to passively monitor local area ne
 - Log viewer
 
 **Embedded:** Compiled to static assets and embedded into the Rust binary using `rust-embed`. No separate web server needed.
-
-**Key Files:**
-
-- [console/src/](../console/src/) - SvelteKit application
 
 ## Data Flow
 
