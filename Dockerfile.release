@@ -80,7 +80,7 @@ RUN cargo zigbuild --release --target x86_64-unknown-linux-musl || true
 
 
 COPY daemon/ ./
-COPY --from=console-builder /build/console/build ./console/build
+COPY --from=console-builder /build/console/build ../console/build
 
 RUN mkdir /out
 

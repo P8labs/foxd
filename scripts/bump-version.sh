@@ -80,7 +80,7 @@ show_info() {
     echo -e "${BLUE}═══════════════════════════════════════════════════${NC}"
     echo -e "${YELLOW}Version:${NC}     $version"
     echo -e "${YELLOW}Binary:${NC}      foxd"
-    echo -e "${YELLOW}Platform:${NC}    Linux (x86_64, ARM64, ARMv7), Windows (x86_64)"
+    echo -e "${YELLOW}Platform:${NC}    Linux (x86_64, ARM64, ARMv7)"
     echo -e "${YELLOW}Language:${NC}    Rust"
     echo -e "${YELLOW}Console:${NC}     SvelteKit"
     echo -e "${BLUE}═══════════════════════════════════════════════════${NC}\n"
@@ -98,7 +98,7 @@ create_tag() {
     
     echo -e "${GREEN}✓ Tag created: $tag${NC}\n"
     echo -e "${BLUE}To push the tag and trigger release:${NC}"
-    echo -e "${YELLOW}  git push origin main && git push origin $tag${NC}\n"
+    echo -e "${YELLOW}  git push origin master && git push origin $tag${NC}\n"
 }
 
 # Main script
