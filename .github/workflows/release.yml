@@ -22,6 +22,12 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-latest
             artifact: foxd-linux-armv7
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: foxd-windows-amd64.exe
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            artifact: foxd-windows-arm64.exe
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -51,25 +57,42 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install cross
-        if: matrix.target != 'x86_64-unknown-linux-gnu'
+        if: matrix.target != 'x86_64-unknown-linux-gnu' && runner.os != 'Windows'
         run: cargo install cross --git https://github.com/cross-rs/cross
 
-      - name: Install build deps (native)
+      - name: Install build deps (Linux native)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
 
-      - name: Build (native)
+      - name: Install npcap SDK (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          curl -L -o npcap-sdk.zip https://npcap.com/dist/npcap-sdk-1.13.zip
+          unzip npcap-sdk.zip -d npcap-sdk
+          echo "LIB=${{ github.workspace }}/npcap-sdk/Lib/x64" >> $GITHUB_ENV
+
+      - name: Build (Linux native)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         working-directory: daemon
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Build (Windows native)
+        if: runner.os == 'Windows'
+        working-directory: daemon
+        run: cargo build --release --target ${{ matrix.target }}
+
       - name: Build (cross)
-        if: matrix.target != 'x86_64-unknown-linux-gnu'
+        if: matrix.target != 'x86_64-unknown-linux-gnu' && runner.os != 'Windows'
         working-directory: daemon
         run: cross build --release --target ${{ matrix.target }}
 
-      - name: Rename binary
+      - name: Rename binary (Unix)
+        if: runner.os != 'Windows'
         run: cp daemon/target/${{ matrix.target }}/release/foxd ${{ matrix.artifact }}
+
+      - name: Rename binary (Windows)
+        if: runner.os == 'Windows'
+        run: cp daemon/target/${{ matrix.target }}/release/foxd.exe ${{ matrix.artifact }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -89,5 +112,19 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          body: |
+            ## Foxd LAN Monitoring Daemon
+
+            A local-first LAN monitoring daemon for tracking device presence and automating network events.
+
+            ### Supported Platforms
+            - **Linux**: x86_64, ARM64, ARMv7
+            - **Windows**: x86_64, ARM64
+
+            ### Installation
+            Download the binary for your platform, make it executable (Linux), and run with appropriate permissions.
+
+            See the [documentation](https://p8labs.github.io/foxd) for setup instructions.
           generate_release_notes: true
+          make_latest: true
           files: foxd-*
