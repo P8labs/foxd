@@ -86,6 +86,7 @@ jobs:
             # Download for your platform
             curl -L -o foxd https://github.com/P8labs/foxd/releases/latest/download/foxd-linux-amd64
             chmod +x foxd
+            sudo setcap cap_net_raw,cap_net_admin=eip foxd
             sudo mv foxd /usr/local/bin/
             ```
 

@@ -1,9 +1,9 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
-    http::{header, StatusCode, Uri},
+    http::{StatusCode, Uri, header},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use chrono::Utc;
 use rust_embed::Embed;
@@ -107,13 +107,31 @@ async fn serve_console(uri: Uri) -> Response {
         }
     }
 
-    let index_path = if path.is_empty() {
-        "index.html".to_string()
-    } else {
-        format!("{}/index.html", path)
-    };
+    if !path.is_empty() && !path.contains('.') {
+        let html_path = format!("{}.html", path);
+        if let Some(content) = ConsoleAssets::get(&html_path) {
+            return (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "text/html".to_string())],
+                content.data.to_vec(),
+            )
+                .into_response();
+        }
+    }
 
-    if let Some(content) = ConsoleAssets::get(&index_path) {
+    if !path.is_empty() {
+        let index_path = format!("{}/index.html", path);
+        if let Some(content) = ConsoleAssets::get(&index_path) {
+            return (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, "text/html".to_string())],
+                content.data.to_vec(),
+            )
+                .into_response();
+        }
+    }
+
+    if let Some(content) = ConsoleAssets::get("index.html") {
         return (
             StatusCode::OK,
             [(header::CONTENT_TYPE, "text/html".to_string())],
@@ -122,19 +140,11 @@ async fn serve_console(uri: Uri) -> Response {
             .into_response();
     }
 
-    match ConsoleAssets::get("index.html") {
-        Some(content) => (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, "text/html".to_string())],
-            content.data.to_vec(),
-        )
-            .into_response(),
-        None => (
-            StatusCode::NOT_FOUND,
-            "Console not available. Build the console first: cd console && pnpm build",
-        )
-            .into_response(),
-    }
+    (
+        StatusCode::NOT_FOUND,
+        "Console not available. Rebuild with: cargo clean && cargo build --release",
+    )
+        .into_response()
 }
 
 async fn health_check(State(state): State<AppState>) -> impl IntoResponse {

@@ -15,7 +15,8 @@ Download the latest release for your platform from the [releases page](https://g
 ```bash
 # Example for Linux x86_64
 curl -L -o foxd https://github.com/p8labs/foxd/releases/latest/download/foxd-linux-amd64
-chmod +x foxd
+chmod +x
+sudo setcap cap_net_raw,cap_net_admin=eip ./foxd
 sudo mv foxd /usr/local/bin/
 ```
 
@@ -32,7 +33,7 @@ Available binaries:
 You need Rust, Node.js, and pnpm installed.
 
 ```bash
-git clone https://github.com/p8labs/foxd.git
+git clone https://github.com/P8labs/foxd.git
 cd foxd
 ./build.sh
 ```
