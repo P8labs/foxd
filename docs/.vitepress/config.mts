@@ -26,22 +26,20 @@ export default defineConfig({
         text: "Guides",
         items: [
           { text: "Configuration", link: "/guide/configuration" },
-          { text: "Device Tracking", link: "/guide/devices" },
-          { text: "Rules & Automation", link: "/guide/rules" },
           { text: "Notifications", link: "/guide/notifications" },
           {
             text: "Notification Channels",
             link: "/guide/notification-channels",
           },
+          { text: "Architecture", link: "/guide/architecture" },
+          { text: "Troubleshooting", link: "/guide/troubleshooting" },
         ],
       },
       {
         text: "API Reference",
         items: [
-          { text: "Overview", link: "/api/" },
-          { text: "Devices API", link: "/api/devices" },
-          { text: "Rules API", link: "/api/rules" },
-          { text: "Config API", link: "/api/config" },
+          { text: "REST API", link: "/api/" },
+          { text: "Examples", link: "/api/examples" },
         ],
       },
     ],
