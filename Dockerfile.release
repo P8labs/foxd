@@ -64,7 +64,7 @@ RUN cd /tmp/libpcap-1.10.4 \
 
 WORKDIR /build
 
-COPY daemon/Cargo.toml daemon/Cargo.lock ./daemon/
+COPY daemon/Cargo.toml ./daemon/
 WORKDIR /build/daemon
 
 RUN mkdir src && echo "fn main(){}" > src/main.rs
