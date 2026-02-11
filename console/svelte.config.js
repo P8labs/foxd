@@ -1,6 +1,14 @@
 import adapter from "@sveltejs/adapter-static";
 
 /** @type {import('@sveltejs/kit').Config} */
-const config = { kit: { adapter: adapter() } };
+const config = {
+  kit: {
+    adapter: adapter(),
+    router: {
+      resolution: "server",
+      type: "pathname",
+    },
+  },
+};
 
 export default config;

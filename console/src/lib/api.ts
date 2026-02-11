@@ -95,7 +95,16 @@ export interface Config {
   database: {
     path: string;
   };
-  notifications: NotificationChannel[];
+}
+
+export interface NotificationChannelWithId {
+  id: number;
+  channel: NotificationChannel;
+}
+
+export interface NotificationChannelsResponse {
+  channels: NotificationChannelWithId[];
+  count: number;
 }
 
 export interface HealthResponse {
@@ -193,14 +202,14 @@ class ApiClient {
     rule: Partial<CreateRuleRequest>,
   ): Promise<Rule> {
     return this.request<Rule>(`/rules/${id}`, {
-      method: "PUT",
+      method: "POST",
       body: JSON.stringify(rule),
     });
   }
 
   async deleteRule(id: number): Promise<void> {
-    await this.request<void>(`/rules/${id}`, {
-      method: "DELETE",
+    await this.request<void>(`/rules/${id}/delete`, {
+      method: "POST",
     });
   }
 
@@ -208,10 +217,43 @@ class ApiClient {
     return this.request<Config>("/config");
   }
 
-  async updateConfig(config: Partial<Config>): Promise<Config> {
-    return this.request<Config>("/config", {
+  async updateConfig(config: Partial<Config>): Promise<void> {
+    await this.request<{ message: string }>("/config", {
       method: "POST",
       body: JSON.stringify(config),
+    });
+  }
+
+  async getNotificationChannels(): Promise<NotificationChannelsResponse> {
+    return this.request<NotificationChannelsResponse>("/notifications");
+  }
+
+  async getNotificationChannel(id: number): Promise<NotificationChannelWithId> {
+    return this.request<NotificationChannelWithId>(`/notifications/${id}`);
+  }
+
+  async createNotificationChannel(
+    channel: NotificationChannel,
+  ): Promise<NotificationChannelWithId> {
+    return this.request<NotificationChannelWithId>("/notifications", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    });
+  }
+
+  async updateNotificationChannel(
+    id: number,
+    channel: NotificationChannel,
+  ): Promise<NotificationChannelWithId> {
+    return this.request<NotificationChannelWithId>(`/notifications/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    });
+  }
+
+  async deleteNotificationChannel(id: number): Promise<void> {
+    await this.request<{ message: string }>(`/notifications/${id}`, {
+      method: "DELETE",
     });
   }
 
@@ -269,5 +311,18 @@ export function getTriggerTypeLabel(type: Rule["trigger_type"]): string {
       return "Status Change";
     default:
       return type;
+  }
+}
+
+export function getChannelName(channel: NotificationChannel): string {
+  switch (channel.type) {
+    case "telegram":
+      return `telegram_${channel.chat_id}`;
+    case "ntfy":
+      return `ntfy_${channel.topic}`;
+    case "webhook":
+      return `webhook_${channel.url.split("/").pop() || "unknown"}`;
+    default:
+      return "unknown";
   }
 }

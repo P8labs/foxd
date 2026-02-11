@@ -19,7 +19,8 @@ use crate::db::Database;
 use crate::errors::Result;
 use crate::models::{
     Config, ConfigUpdateRequest, Device, DeviceNicknameRequest, DeviceStatus, DevicesResponse,
-    ErrorResponse, LogsResponse, Metrics, Rule, RuleRequest, RulesResponse, SuccessResponse,
+    ErrorResponse, LogsResponse, Metrics, NotificationChannel, NotificationChannelWithId,
+    NotificationChannelsResponse, Rule, RuleRequest, RulesResponse, SuccessResponse,
 };
 
 #[derive(Embed)]
@@ -55,6 +56,16 @@ pub fn create_router(state: AppState) -> Router {
         .route("/rules/{id}", get(get_rule).post(update_rule))
         .route("/rules/{id}/delete", post(delete_rule))
         .route("/config", get(get_config).post(update_config))
+        .route(
+            "/notifications",
+            get(get_notification_channels).post(create_notification_channel),
+        )
+        .route(
+            "/notifications/{id}",
+            get(get_notification_channel)
+                .put(update_notification_channel)
+                .delete(delete_notification_channel),
+        )
         .route("/metrics", get(get_metrics))
         .route("/logs", get(get_logs))
         .route("/restart", post(restart_daemon))
@@ -309,18 +320,6 @@ async fn update_config(
 ) -> Result<Json<SuccessResponse>> {
     let mut config = state.config.write().await;
 
-    if let Some(notifications) = request.notifications {
-        config.notifications = notifications.clone();
-
-        if let Some(daemon) = &state.daemon {
-            let notifier = daemon.get_notifier();
-            let mut notifier_guard = notifier.write().await;
-            notifier_guard.update_channels(notifications);
-        }
-
-        info!("Updated notification channels");
-    }
-
     if let Some(daemon_config) = request.daemon {
         config.daemon = daemon_config;
         info!("Updated daemon configuration (requires restart)");
@@ -328,6 +327,134 @@ async fn update_config(
 
     Ok(Json(SuccessResponse {
         message: "Configuration updated successfully".to_string(),
+    }))
+}
+
+async fn get_notification_channels(
+    State(state): State<AppState>,
+) -> Result<Json<NotificationChannelsResponse>> {
+    let channels = state.db.get_all_notification_channels().await?;
+    let count = channels.len();
+
+    Ok(Json(NotificationChannelsResponse { channels, count }))
+}
+
+async fn get_notification_channel(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<NotificationChannelWithId>> {
+    let channel = state
+        .db
+        .get_notification_channel_by_id(id)
+        .await?
+        .ok_or_else(|| {
+            crate::errors::DaemonError::NotFound(format!("Notification channel {} not found", id))
+        })?;
+
+    Ok(Json(channel))
+}
+
+async fn create_notification_channel(
+    State(state): State<AppState>,
+    Json(channel): Json<NotificationChannel>,
+) -> Result<Json<NotificationChannelWithId>> {
+    let id = state.db.create_notification_channel(&channel).await?;
+
+    let created_channel = state
+        .db
+        .get_notification_channel_by_id(id)
+        .await?
+        .ok_or_else(|| {
+            crate::errors::DaemonError::Internal(
+                "Failed to retrieve created notification channel".to_string(),
+            )
+        })?;
+
+    info!(
+        "Created notification channel: {} (id: {})",
+        channel.name(),
+        id
+    );
+
+    // Update notifier with new channels
+    if let Some(daemon) = &state.daemon {
+        let all_channels = state.db.get_all_notification_channels_raw().await?;
+        let notifier = daemon.get_notifier();
+        let mut notifier_guard = notifier.write().await;
+        notifier_guard.update_channels(all_channels);
+    }
+
+    Ok(Json(created_channel))
+}
+
+async fn update_notification_channel(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(channel): Json<NotificationChannel>,
+) -> Result<Json<NotificationChannelWithId>> {
+    let _ = state
+        .db
+        .get_notification_channel_by_id(id)
+        .await?
+        .ok_or_else(|| {
+            crate::errors::DaemonError::NotFound(format!("Notification channel {} not found", id))
+        })?;
+
+    state.db.update_notification_channel(id, &channel).await?;
+
+    let updated_channel = state
+        .db
+        .get_notification_channel_by_id(id)
+        .await?
+        .ok_or_else(|| {
+            crate::errors::DaemonError::Internal(
+                "Failed to retrieve updated notification channel".to_string(),
+            )
+        })?;
+
+    info!(
+        "Updated notification channel: {} (id: {})",
+        channel.name(),
+        id
+    );
+
+    // Update notifier with new channels
+    if let Some(daemon) = &state.daemon {
+        let all_channels = state.db.get_all_notification_channels_raw().await?;
+        let notifier = daemon.get_notifier();
+        let mut notifier_guard = notifier.write().await;
+        notifier_guard.update_channels(all_channels);
+    }
+
+    Ok(Json(updated_channel))
+}
+
+async fn delete_notification_channel(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<SuccessResponse>> {
+    let _ = state
+        .db
+        .get_notification_channel_by_id(id)
+        .await?
+        .ok_or_else(|| {
+            crate::errors::DaemonError::NotFound(format!("Notification channel {} not found", id))
+        })?;
+
+    state.db.delete_notification_channel(id).await?;
+
+    info!("Deleted notification channel with id: {}", id);
+
+    // Update notifier with remaining channels
+    if let Some(daemon) = &state.daemon {
+        let all_channels = state.db.get_all_notification_channels_raw().await?;
+        let notifier = daemon.get_notifier();
+        let mut notifier_guard = notifier.write().await;
+        notifier_guard.update_channels(all_channels);
+    }
+
+    Ok(Json(SuccessResponse {
+        message: format!("Notification channel {} deleted successfully", id),
     }))
 }
 

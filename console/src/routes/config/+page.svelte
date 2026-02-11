@@ -1,12 +1,19 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type Config, type NotificationChannel } from "$lib/api";
+  import {
+    api,
+    type Config,
+    type NotificationChannel,
+    type NotificationChannelWithId,
+  } from "$lib/api";
   import Loading from "$lib/components/Loading.svelte";
   import Alert from "$lib/components/Alert.svelte";
   import Modal from "$lib/components/Modal.svelte";
 
   let config: Config | null = $state(null);
+  let channels: NotificationChannelWithId[] = $state([]);
   let loading = $state(true);
+  let channelsLoading = $state(true);
   let error = $state("");
   let success = $state("");
   let showChannelModal = $state(false);
@@ -33,6 +40,22 @@
         err instanceof Error ? err.message : "Failed to load configuration";
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadChannels() {
+    try {
+      channelsLoading = true;
+      error = "";
+      const response = await api.getNotificationChannels();
+      channels = response.channels;
+    } catch (err) {
+      error =
+        err instanceof Error
+          ? err.message
+          : "Failed to load notification channels";
+    } finally {
+      channelsLoading = false;
     }
   }
 
@@ -83,32 +106,27 @@
         };
       }
 
-      const updatedChannels = [...config.notifications, channel];
-      await api.updateConfig({ notifications: updatedChannels });
+      await api.createNotificationChannel(channel);
 
       success = "Notification channel added successfully";
       showChannelModal = false;
-      await loadConfig();
+      await loadChannels();
       setTimeout(() => (success = ""), 3000);
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to add channel";
     }
   }
 
-  async function removeChannel(index: number) {
-    if (!config) return;
+  async function removeChannel(id: number) {
     if (!confirm("Are you sure you want to remove this notification channel?"))
       return;
 
     try {
       error = "";
-      const updatedChannels = config.notifications.filter(
-        (_, i) => i !== index,
-      );
-      await api.updateConfig({ notifications: updatedChannels });
+      await api.deleteNotificationChannel(id);
 
       success = "Notification channel removed successfully";
-      await loadConfig();
+      await loadChannels();
       setTimeout(() => (success = ""), 3000);
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to remove channel";
@@ -117,6 +135,7 @@
 
   onMount(() => {
     loadConfig();
+    loadChannels();
   });
 </script>
 
@@ -132,7 +151,15 @@
       Manage daemon settings and notification channels
     </p>
   </div>
-  <button class="btn btn-primary" onclick={loadConfig}> Refresh </button>
+  <button
+    class="btn btn-primary"
+    onclick={() => {
+      loadConfig();
+      loadChannels();
+    }}
+  >
+    Refresh
+  </button>
 </div>
 
 <!-- Alerts -->
@@ -234,7 +261,9 @@
       </button>
     </div>
 
-    {#if config.notifications.length > 0}
+    {#if channelsLoading}
+      <Loading message="Loading notification channels..." />
+    {:else if channels.length > 0}
       <div class="table-container">
         <table class="table">
           <thead>
@@ -245,7 +274,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each config.notifications as channel, index}
+            {#each channels as { id, channel }}
               <tr>
                 <td>
                   <span
@@ -282,7 +311,7 @@
                 <td>
                   <button
                     class="btn btn-danger btn-sm"
-                    onclick={() => removeChannel(index)}
+                    onclick={() => removeChannel(id)}
                   >
                     Remove
                   </button>

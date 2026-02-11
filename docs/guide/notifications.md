@@ -1,19 +1,12 @@
 # Notifications
 
-foxd can send notifications when network events occur. You configure notification channels in `config.toml` and then reference them in rules.
+foxd can send notifications when network events occur. Notification channels are stored in the database and managed from the web console or the REST API. Rules reference these channels by name.
 
 ## Supported Channels
 
 ### Telegram
 
 Send notifications via a Telegram bot.
-
-```toml
-[[notifications]]
-type = "telegram"
-bot_token = "123456:ABC-DEF"
-chat_id = "987654321"
-```
 
 To set up a Telegram bot:
 
@@ -25,44 +18,13 @@ To set up a Telegram bot:
 
 Send notifications to an [ntfy](https://ntfy.sh) topic.
 
-```toml
-[[notifications]]
-type = "ntfy"
-server_url = "https://ntfy.sh"
-topic = "foxd-lan-monitor"
-# Optional authentication token
-# token = "tk_YOUR_TOKEN_HERE"
-```
-
 ### Webhook
 
 Send a POST request to any URL.
 
-```toml
-[[notifications]]
-type = "webhook"
-url = "https://example.com/webhook"
-```
+## Managing Channels
 
-## Multiple Channels
-
-You can configure as many channels as you want. Each `[[notifications]]` block defines one channel.
-
-```toml
-[[notifications]]
-type = "telegram"
-bot_token = "TOKEN_1"
-chat_id = "CHAT_1"
-
-[[notifications]]
-type = "ntfy"
-server_url = "https://ntfy.sh"
-topic = "foxd-alerts"
-
-[[notifications]]
-type = "webhook"
-url = "https://example.com/hook"
-```
+Use the console UI (Configuration -> Notification Channels) to add or remove channels. You can also manage channels via the REST API. See the [Notification Channel Management](/guide/notification-channels) guide for examples and payloads.
 
 ## Rules
 

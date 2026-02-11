@@ -29,6 +29,10 @@ export default defineConfig({
           { text: "Device Tracking", link: "/guide/devices" },
           { text: "Rules & Automation", link: "/guide/rules" },
           { text: "Notifications", link: "/guide/notifications" },
+          {
+            text: "Notification Channels",
+            link: "/guide/notification-channels",
+          },
         ],
       },
       {

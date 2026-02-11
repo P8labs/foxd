@@ -73,7 +73,7 @@ You can also configure foxd with environment variables instead of a config file:
 
 ### Web console
 
-Once foxd is running, open your browser to `http://<host>:8080` to access the built-in web console. The console lets you view devices, manage rules, configure notifications, and check logs.
+Once foxd is running, open your browser to `http://<host>:8080` to access the built-in web console. The console lets you view devices, manage rules, configure notification channels, and check logs.
 
 ### Run as a systemd service
 

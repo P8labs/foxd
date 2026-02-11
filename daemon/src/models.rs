@@ -108,12 +108,17 @@ impl NotificationChannel {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NotificationChannelWithId {
+    pub id: i64,
+    pub channel: NotificationChannel,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub daemon: DaemonConfig,
     pub database: DatabaseConfig,
     pub api: ApiConfig,
-    pub notifications: Vec<NotificationChannel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,8 +144,13 @@ pub struct ApiConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigUpdateRequest {
-    pub notifications: Option<Vec<NotificationChannel>>,
     pub daemon: Option<DaemonConfig>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NotificationChannelsResponse {
+    pub channels: Vec<NotificationChannelWithId>,
+    pub count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

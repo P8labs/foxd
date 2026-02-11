@@ -40,18 +40,9 @@ path = "./foxd.db"
 [api]
 host = "0.0.0.0"
 port = 8080
-
-# Add notification channels
-[[notifications]]
-type = "telegram"
-bot_token = "YOUR_BOT_TOKEN"
-chat_id = "YOUR_CHAT_ID"
-
-[[notifications]]
-type = "ntfy"
-server_url = "https://ntfy.sh"
-topic = "your-topic"
 ```
+
+Notification channels are managed from the web console (Configuration -> Notification Channels) or the REST API. You no longer add them to `config.toml`.
 
 ### Setting up Telegram Notifications
 
@@ -59,20 +50,13 @@ topic = "your-topic"
 2. Get your bot token
 3. Start a chat with your bot
 4. Get your chat ID by visiting: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
-5. Add credentials to `config.toml`
+5. Add the channel in the console under Configuration -> Notification Channels
 
 ### Setting up ntfy.sh Notifications
 
 1. Choose a unique topic name (e.g., `foxd-alerts-12345`)
 2. Subscribe to it on your phone using the [ntfy app](https://ntfy.sh/)
-3. Add to `config.toml`:
-
-```toml
-[[notifications]]
-type = "ntfy"
-server_url = "https://ntfy.sh"
-topic = "your-unique-topic"
-```
+3. Add the channel in the console under Configuration -> Notification Channels
 
 ## Building
 

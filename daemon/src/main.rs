@@ -40,10 +40,11 @@ async fn main() -> Result<()> {
     let db = Database::new(&db_url).await?;
     info!("Database initialized");
 
-    let notifier = Notifier::new(config.notifications.clone());
+    let notification_channels = db.get_all_notification_channels_raw().await?;
+    let notifier = Notifier::new(notification_channels.clone());
     info!(
         "Notification service initialized with {} channels",
-        config.notifications.len()
+        notification_channels.len()
     );
 
     let daemon = Arc::new(Daemon::new(
@@ -156,6 +157,5 @@ fn default_config() -> Config {
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(8080),
         },
-        notifications: vec![],
     }
 }

@@ -2,6 +2,8 @@
 
 foxd is configured via a `config.toml` file. If no config file is found, foxd uses sensible defaults.
 
+Notification channels are managed from the web console (Configuration -> Notification Channels) or the REST API, not from `config.toml`.
+
 The config file path defaults to `config.toml` in the current directory. Override it with the `FOXD_CONFIG` environment variable.
 
 ## Full Example

@@ -110,6 +110,29 @@ impl Database {
         .execute(&self.pool)
         .await?;
 
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS notification_channels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                channel_type TEXT NOT NULL,
+                config TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_notification_channels_name ON notification_channels(name);
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
         info!("Database migrations completed");
         Ok(())
     }
@@ -539,5 +562,142 @@ impl Database {
             message: row.get("message"),
             details: row.get("details"),
         })
+    }
+
+    // Notification Channels
+    pub async fn create_notification_channel(
+        &self,
+        channel: &crate::models::NotificationChannel,
+    ) -> Result<i64> {
+        let name = channel.name();
+        let channel_type = match channel {
+            crate::models::NotificationChannel::Telegram { .. } => "telegram",
+            crate::models::NotificationChannel::Ntfy { .. } => "ntfy",
+            crate::models::NotificationChannel::Webhook { .. } => "webhook",
+        };
+        let config = serde_json::to_string(channel)
+            .map_err(|e| DaemonError::Internal(format!("Failed to serialize channel: {}", e)))?;
+        let now = Utc::now().to_rfc3339();
+
+        let result = sqlx::query(
+            "INSERT INTO notification_channels (name, channel_type, config, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(&name)
+        .bind(channel_type)
+        .bind(&config)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.last_insert_rowid())
+    }
+
+    pub async fn get_notification_channel_by_id(
+        &self,
+        id: i64,
+    ) -> Result<Option<crate::models::NotificationChannelWithId>> {
+        let row = sqlx::query("SELECT id, config FROM notification_channels WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        if let Some(row) = row {
+            let config: String = row.get("config");
+            let channel: crate::models::NotificationChannel = serde_json::from_str(&config)
+                .map_err(|e| {
+                    DaemonError::Internal(format!("Failed to deserialize channel: {}", e))
+                })?;
+            Ok(Some(crate::models::NotificationChannelWithId {
+                id: row.get("id"),
+                channel,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn get_all_notification_channels(
+        &self,
+    ) -> Result<Vec<crate::models::NotificationChannelWithId>> {
+        let rows = sqlx::query("SELECT id, config FROM notification_channels ORDER BY created_at")
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut channels = Vec::new();
+        for row in rows {
+            let config: String = row.get("config");
+            let channel: crate::models::NotificationChannel = serde_json::from_str(&config)
+                .map_err(|e| {
+                    DaemonError::Internal(format!("Failed to deserialize channel: {}", e))
+                })?;
+            channels.push(crate::models::NotificationChannelWithId {
+                id: row.get("id"),
+                channel,
+            });
+        }
+
+        Ok(channels)
+    }
+
+    pub async fn get_all_notification_channels_raw(
+        &self,
+    ) -> Result<Vec<crate::models::NotificationChannel>> {
+        let rows = sqlx::query("SELECT config FROM notification_channels ORDER BY created_at")
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut channels = Vec::new();
+        for row in rows {
+            let config: String = row.get("config");
+            let channel: crate::models::NotificationChannel = serde_json::from_str(&config)
+                .map_err(|e| {
+                    DaemonError::Internal(format!("Failed to deserialize channel: {}", e))
+                })?;
+            channels.push(channel);
+        }
+
+        Ok(channels)
+    }
+
+    pub async fn update_notification_channel(
+        &self,
+        id: i64,
+        channel: &crate::models::NotificationChannel,
+    ) -> Result<()> {
+        let name = channel.name();
+        let channel_type = match channel {
+            crate::models::NotificationChannel::Telegram { .. } => "telegram",
+            crate::models::NotificationChannel::Ntfy { .. } => "ntfy",
+            crate::models::NotificationChannel::Webhook { .. } => "webhook",
+        };
+        let config = serde_json::to_string(channel)
+            .map_err(|e| DaemonError::Internal(format!("Failed to serialize channel: {}", e)))?;
+        let now = Utc::now().to_rfc3339();
+
+        sqlx::query(
+            "UPDATE notification_channels
+             SET name = ?, channel_type = ?, config = ?, updated_at = ?
+             WHERE id = ?",
+        )
+        .bind(&name)
+        .bind(channel_type)
+        .bind(&config)
+        .bind(&now)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_notification_channel(&self, id: i64) -> Result<()> {
+        sqlx::query("DELETE FROM notification_channels WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 }
