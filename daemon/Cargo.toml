@@ -2,15 +2,15 @@
 name = "foxd-daemon"
 version = "0.1.0"
 edition = "2021"
-authors = ["Fox Daemon Contributors"]
-description = "LAN monitoring daemon with packet capture and notifications"
+authors = ["P8labs"]
+description = "LAN monitoring daemon with packet capture, notifications, and built-in web console"
 
 [lib]
 name = "foxd_daemon"
 path = "src/lib.rs"
 
 [[bin]]
-name = "foxd-daemon"
+name = "foxd"
 path = "src/main.rs"
 
 [dependencies]
@@ -37,7 +37,7 @@ pnet = { version = "0.34", features = ["std"] }
 
 # Netlink for Linux neighbor table
 rtnetlink = "0.14"
-netlink-packet-route = "0.18"
+netlink-packet-route = "0.19"
 futures = "0.3"
 libc = "0.2"
 
@@ -67,6 +67,10 @@ async-channel = "2.1"
 # Network utilities
 ipnetwork = "0.20"
 mac_address = "1.1"
+
+# Embedded console
+rust-embed = "8"
+mime_guess = "2"
 
 [dev-dependencies]
 mockito = "1.2"

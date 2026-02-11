@@ -12,9 +12,6 @@ pub enum DaemonError {
     #[error("Configuration error: {0}")]
     Config(String),
 
-    #[error("Network error: {0}")]
-    Network(String),
-
     #[error("Packet capture error: {0}")]
     PacketCapture(String),
 
@@ -35,9 +32,6 @@ pub enum DaemonError {
 
     #[error("Not found: {0}")]
     NotFound(String),
-
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
 
     #[error("Internal error: {0}")]
     Internal(String),
@@ -66,7 +60,6 @@ impl IntoResponse for DaemonError {
         let (status, error_message) = match &self {
             DaemonError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             DaemonError::Config(_) => (StatusCode::BAD_REQUEST, self.to_string()),
-            DaemonError::Network(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             DaemonError::PacketCapture(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             DaemonError::Netlink(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             DaemonError::Notification(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
@@ -74,7 +67,6 @@ impl IntoResponse for DaemonError {
             DaemonError::Io(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             DaemonError::Serialization(_) => (StatusCode::BAD_REQUEST, self.to_string()),
             DaemonError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
-            DaemonError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             DaemonError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 

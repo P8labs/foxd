@@ -5,7 +5,7 @@ use std::str::FromStr;
 use tracing::info;
 
 use crate::errors::{DaemonError, Result};
-use crate::models::{Device, DeviceStatus, Rule, TriggerType};
+use crate::models::{Device, DeviceStatus, LogEntry, LogLevel, Rule, TriggerType};
 
 #[derive(Clone)]
 pub struct Database {
@@ -81,6 +81,30 @@ impl Database {
         sqlx::query(
             r#"
             CREATE INDEX IF NOT EXISTS idx_rules_enabled ON rules(enabled);
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                level TEXT NOT NULL,
+                category TEXT NOT NULL,
+                message TEXT NOT NULL,
+                details TEXT
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
             "#,
         )
         .execute(&self.pool)
@@ -417,5 +441,103 @@ impl Database {
             .await?;
 
         Ok(row.get("count"))
+    }
+
+    // Log management functions
+    pub async fn create_log(&self, entry: &LogEntry) -> Result<i64> {
+        let timestamp = entry.timestamp.to_rfc3339();
+        let level_str = entry.level.to_string();
+
+        let result = sqlx::query(
+            r#"
+            INSERT INTO logs (timestamp, level, category, message, details)
+            VALUES (?, ?, ?, ?, ?)
+            RETURNING id
+            "#,
+        )
+        .bind(&timestamp)
+        .bind(&level_str)
+        .bind(&entry.category)
+        .bind(&entry.message)
+        .bind(&entry.details)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(result.get(0))
+    }
+
+    pub async fn get_logs(
+        &self,
+        limit: Option<i64>,
+        level: Option<LogLevel>,
+    ) -> Result<Vec<LogEntry>> {
+        let limit_value = limit.unwrap_or(100);
+
+        let logs = if let Some(log_level) = level {
+            let level_str = log_level.to_string();
+            sqlx::query(
+                r#"
+                SELECT id, timestamp, level, category, message, details
+                FROM logs
+                WHERE level = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+                "#,
+            )
+            .bind(&level_str)
+            .bind(limit_value)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query(
+                r#"
+                SELECT id, timestamp, level, category, message, details
+                FROM logs
+                ORDER BY timestamp DESC
+                LIMIT ?
+                "#,
+            )
+            .bind(limit_value)
+            .fetch_all(&self.pool)
+            .await?
+        };
+
+        logs.into_iter().map(|row| self.row_to_log(row)).collect()
+    }
+
+    pub async fn clear_old_logs(&self, days: i64) -> Result<i64> {
+        let cutoff = Utc::now() - chrono::Duration::days(days);
+        let cutoff_str = cutoff.to_rfc3339();
+
+        let result = sqlx::query("DELETE FROM logs WHERE timestamp < ?")
+            .bind(&cutoff_str)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(result.rows_affected() as i64)
+    }
+
+    fn row_to_log(&self, row: sqlx::sqlite::SqliteRow) -> Result<LogEntry> {
+        let level_str: String = row.get("level");
+        let level = match level_str.as_str() {
+            "info" => LogLevel::Info,
+            "warning" => LogLevel::Warning,
+            "error" => LogLevel::Error,
+            "debug" => LogLevel::Debug,
+            _ => LogLevel::Info,
+        };
+
+        let timestamp_str: String = row.get("timestamp");
+
+        Ok(LogEntry {
+            id: Some(row.get("id")),
+            timestamp: chrono::DateTime::parse_from_rfc3339(&timestamp_str)
+                .map_err(|e| DaemonError::Database(sqlx::Error::Decode(Box::new(e))))?
+                .with_timezone(&Utc),
+            level,
+            category: row.get("category"),
+            message: row.get("message"),
+            details: row.get("details"),
+        })
     }
 }

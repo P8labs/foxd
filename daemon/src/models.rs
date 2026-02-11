@@ -122,6 +122,8 @@ pub struct DaemonConfig {
     pub capture_filter: Option<String>,
     pub neighbor_check_interval_secs: u64,
     pub device_timeout_secs: u64,
+    pub log_cleanup_enabled: bool,
+    pub log_retention_days: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,7 +161,6 @@ pub enum NetworkEvent {
     ArpRequest {
         source_mac: String,
         source_ip: IpAddr,
-        target_ip: IpAddr,
     },
     ArpReply {
         source_mac: String,
@@ -219,4 +220,40 @@ pub struct Metrics {
     pub packets_captured: u64,
     pub notifications_sent: u64,
     pub uptime_seconds: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    Info,
+    Warning,
+    Error,
+    Debug,
+}
+
+impl std::fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogLevel::Info => write!(f, "info"),
+            LogLevel::Warning => write!(f, "warning"),
+            LogLevel::Error => write!(f, "error"),
+            LogLevel::Debug => write!(f, "debug"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogEntry {
+    pub id: Option<i64>,
+    pub timestamp: DateTime<Utc>,
+    pub level: LogLevel,
+    pub category: String,
+    pub message: String,
+    pub details: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LogsResponse {
+    pub logs: Vec<LogEntry>,
+    pub count: usize,
 }

@@ -1,13 +1,16 @@
 use axum::{
     extract::{Path, State},
-    response::IntoResponse,
+    http::{header, StatusCode, Uri},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use chrono::Utc;
+use rust_embed::Embed;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -16,8 +19,12 @@ use crate::db::Database;
 use crate::errors::Result;
 use crate::models::{
     Config, ConfigUpdateRequest, Device, DeviceNicknameRequest, DeviceStatus, DevicesResponse,
-    Metrics, Rule, RuleRequest, RulesResponse, SuccessResponse,
+    ErrorResponse, LogsResponse, Metrics, Rule, RuleRequest, RulesResponse, SuccessResponse,
 };
+
+#[derive(Embed)]
+#[folder = "../console/build/"]
+struct ConsoleAssets;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -39,22 +46,84 @@ impl AppState {
 }
 
 pub fn create_router(state: AppState) -> Router {
-    Router::new()
+    let api_routes = Router::new()
         .route("/health", get(health_check))
         .route("/devices", get(get_devices))
-        .route("/devices/:mac", get(get_device))
-        .route("/devices/:mac/nickname", post(update_device_nickname))
-        .route("/rules", get(get_rules))
-        .route("/rules", post(create_rule))
-        .route("/rules/:id", get(get_rule))
-        .route("/rules/:id", post(update_rule))
-        .route("/rules/:id/delete", post(delete_rule))
-        .route("/config", get(get_config))
-        .route("/config", post(update_config))
+        .route("/devices/{mac}", get(get_device))
+        .route("/devices/{mac}/nickname", post(update_device_nickname))
+        .route("/rules", get(get_rules).post(create_rule))
+        .route("/rules/{id}", get(get_rule).post(update_rule))
+        .route("/rules/{id}/delete", post(delete_rule))
+        .route("/config", get(get_config).post(update_config))
         .route("/metrics", get(get_metrics))
+        .route("/logs", get(get_logs))
         .route("/restart", post(restart_daemon))
+        .fallback(api_fallback)
+        .with_state(state);
+
+    Router::new()
+        .nest("/api", api_routes)
+        .fallback(serve_console)
+        .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
-        .with_state(state)
+}
+
+async fn api_fallback(uri: Uri) -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+            error: format!("Not found: {}", uri.path()),
+            details: None,
+        }),
+    )
+        .into_response()
+}
+
+async fn serve_console(uri: Uri) -> Response {
+    let path = uri.path().trim_start_matches('/');
+
+    if !path.is_empty() {
+        if let Some(content) = ConsoleAssets::get(path) {
+            let mime = mime_guess::from_path(path)
+                .first_or_octet_stream()
+                .to_string();
+            return (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, mime)],
+                content.data.to_vec(),
+            )
+                .into_response();
+        }
+    }
+
+    let index_path = if path.is_empty() {
+        "index.html".to_string()
+    } else {
+        format!("{}/index.html", path)
+    };
+
+    if let Some(content) = ConsoleAssets::get(&index_path) {
+        return (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, "text/html".to_string())],
+            content.data.to_vec(),
+        )
+            .into_response();
+    }
+
+    match ConsoleAssets::get("index.html") {
+        Some(content) => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, "text/html".to_string())],
+            content.data.to_vec(),
+        )
+            .into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            "Console not available. Build the console first: cd console && pnpm build",
+        )
+            .into_response(),
+    }
 }
 
 async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
@@ -76,7 +145,7 @@ async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
 
     Json(serde_json::json!({
         "status": "ok",
-        "service": "foxd-daemon",
+        "service": "foxd",
         "uptime_seconds": uptime_seconds,
         "system": {
             "cpu_usage_percent": cpu_usage,
@@ -308,10 +377,17 @@ async fn restart_daemon() -> Result<Json<SuccessResponse>> {
 
     std::thread::spawn(|| {
         std::thread::sleep(std::time::Duration::from_secs(1));
-        std::process::exit(42); // Exit code 42 signals restart
+        std::process::exit(42);
     });
 
     Ok(Json(SuccessResponse {
         message: "Daemon restart initiated".to_string(),
     }))
+}
+
+async fn get_logs(State(state): State<AppState>) -> Result<Json<LogsResponse>> {
+    let logs = state.db.get_logs(Some(200), None).await?;
+    let count = logs.len();
+
+    Ok(Json(LogsResponse { logs, count }))
 }

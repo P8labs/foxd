@@ -8,6 +8,7 @@
 		{ path: '/', label: 'Dashboard' },
 		{ path: '/devices', label: 'Devices' },
 		{ path: '/rules', label: 'Rules' },
+		{ path: '/logs', label: 'Logs' },
 		{ path: '/config', label: 'Configuration' }
 	];
 

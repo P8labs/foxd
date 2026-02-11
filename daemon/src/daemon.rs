@@ -24,6 +24,8 @@ pub struct Daemon {
     device_timeout: Duration,
     neighbor_check_interval: Duration,
     packets_captured: Arc<std::sync::atomic::AtomicU64>,
+    log_cleanup_enabled: bool,
+    log_retention_days: i64,
 }
 
 impl Daemon {
@@ -33,6 +35,8 @@ impl Daemon {
         interface: String,
         device_timeout_secs: u64,
         neighbor_check_interval_secs: u64,
+        log_cleanup_enabled: bool,
+        log_retention_days: u64,
     ) -> Self {
         Self {
             db,
@@ -41,6 +45,8 @@ impl Daemon {
             device_timeout: Duration::from_secs(device_timeout_secs),
             neighbor_check_interval: Duration::from_secs(neighbor_check_interval_secs),
             packets_captured: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            log_cleanup_enabled,
+            log_retention_days: log_retention_days as i64,
         }
     }
 
@@ -59,7 +65,6 @@ impl Daemon {
             })
         };
 
-        // Spawn netlink monitoring task
         let netlink_handle = {
             let daemon = Arc::clone(&self);
             let tx = event_tx.clone();
@@ -70,7 +75,6 @@ impl Daemon {
             })
         };
 
-        // Spawn event processor task
         let processor_handle = {
             let daemon = Arc::clone(&self);
             tokio::spawn(async move {
@@ -78,7 +82,6 @@ impl Daemon {
             })
         };
 
-        // Spawn periodic device timeout checker
         let timeout_handle = {
             let daemon = Arc::clone(&self);
             tokio::spawn(async move {
@@ -86,12 +89,19 @@ impl Daemon {
             })
         };
 
-        // Wait for all tasks
+        let log_cleanup_handle = {
+            let daemon = Arc::clone(&self);
+            tokio::spawn(async move {
+                daemon.cleanup_old_logs().await;
+            })
+        };
+
         tokio::select! {
             _ = capture_handle => warn!("Packet capture task ended"),
             _ = netlink_handle => warn!("Netlink monitoring task ended"),
             _ = processor_handle => warn!("Event processor task ended"),
             _ = timeout_handle => warn!("Timeout checker task ended"),
+            _ = log_cleanup_handle => warn!("Log cleanup task ended"),
         }
 
         Ok(())
@@ -156,7 +166,6 @@ impl Daemon {
         );
 
         let source_ip = IpAddr::from(arp.get_sender_proto_addr());
-        let target_ip = IpAddr::from(arp.get_target_proto_addr());
 
         let operation = arp.get_operation();
 
@@ -164,7 +173,6 @@ impl Daemon {
             1 => Some(NetworkEvent::ArpRequest {
                 source_mac,
                 source_ip,
-                target_ip,
             }),
             2 => Some(NetworkEvent::ArpReply {
                 source_mac,
@@ -180,9 +188,7 @@ impl Daemon {
         let (connection, handle, _messages) = new_connection()?;
         tokio::spawn(connection);
 
-        // For now, perform periodic neighbor table polling
-        // Full realtime netlink monitoring requires more complex setup
-        let mut check_interval = interval(Duration::from_secs(30));
+        let mut check_interval = interval(self.neighbor_check_interval);
 
         loop {
             check_interval.tick().await;
@@ -274,6 +280,29 @@ impl Daemon {
                 .unwrap_or_else(|| "no IP".to_string())
         );
 
+        // Log device activity
+        if is_new {
+            let log_entry = crate::models::LogEntry {
+                id: None,
+                timestamp: now,
+                level: crate::models::LogLevel::Info,
+                category: "device".to_string(),
+                message: format!("New device discovered: {}", mac),
+                details: ip.map(|i| i.to_string()),
+            };
+            let _ = self.db.create_log(&log_entry).await;
+        } else if old_status != DeviceStatus::Online && device.status == DeviceStatus::Online {
+            let log_entry = crate::models::LogEntry {
+                id: None,
+                timestamp: now,
+                level: crate::models::LogLevel::Info,
+                category: "device".to_string(),
+                message: format!("Device connected: {}", mac),
+                details: ip.map(|i| i.to_string()),
+            };
+            let _ = self.db.create_log(&log_entry).await;
+        }
+
         let rules = self.db.get_enabled_rules().await?;
 
         for rule in rules {
@@ -308,6 +337,17 @@ impl Daemon {
                     .await?;
 
                 debug!("Device disconnected: {}", mac);
+
+                // Log disconnection
+                let log_entry = crate::models::LogEntry {
+                    id: None,
+                    timestamp: Utc::now(),
+                    level: crate::models::LogLevel::Warning,
+                    category: "device".to_string(),
+                    message: format!("Device disconnected: {}", mac),
+                    details: device.ip_address.clone(),
+                };
+                let _ = self.db.create_log(&log_entry).await;
 
                 let rules = self.db.get_enabled_rules().await?;
 
@@ -380,6 +420,32 @@ impl Daemon {
         notifier.send(&event, &rule.notification_channels).await?;
 
         Ok(())
+    }
+
+    async fn cleanup_old_logs(&self) {
+        let mut cleanup_interval = interval(Duration::from_secs(86400));
+
+        loop {
+            cleanup_interval.tick().await;
+
+            if !self.log_cleanup_enabled {
+                continue;
+            }
+
+            match self.db.clear_old_logs(self.log_retention_days).await {
+                Ok(deleted_count) => {
+                    if deleted_count > 0 {
+                        info!(
+                            "Cleaned up {} old log entries (retention: {} days)",
+                            deleted_count, self.log_retention_days
+                        );
+                    }
+                }
+                Err(e) => {
+                    error!("Error cleaning up old logs: {}", e);
+                }
+            }
+        }
     }
 
     pub fn get_notifier(&self) -> Arc<RwLock<Notifier>> {

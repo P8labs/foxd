@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("🦊 Fox Daemon starting...");
+    info!("foxd starting...");
 
     let config = load_config()?;
     info!("Configuration loaded from config.toml");
@@ -52,11 +52,15 @@ async fn main() -> Result<()> {
         config.daemon.interface.clone(),
         config.daemon.device_timeout_secs,
         config.daemon.neighbor_check_interval_secs,
+        config.daemon.log_cleanup_enabled,
+        config.daemon.log_retention_days,
     ));
 
     let api_state = AppState::new(db, config.clone(), Some(Arc::clone(&daemon)));
 
-    let daemon_handle = {
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
+    let mut daemon_handle = {
         let daemon = Arc::clone(&daemon);
         tokio::spawn(async move {
             if let Err(e) = daemon.start().await {
@@ -65,7 +69,7 @@ async fn main() -> Result<()> {
         })
     };
 
-    let api_handle = tokio::spawn(async move {
+    let mut api_handle = tokio::spawn(async move {
         let addr = SocketAddr::from((
             config
                 .api
@@ -85,22 +89,36 @@ async fn main() -> Result<()> {
 
         info!("API server listening on {}", addr);
 
-        axum::serve(listener, app).await.expect("Server error");
+        let mut rx = shutdown_rx;
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async move {
+                rx.changed().await.ok();
+            })
+            .await
+            .expect("Server error");
+
+        info!("API server stopped");
     });
 
     tokio::select! {
-        _ = daemon_handle => {
+        _ = &mut daemon_handle => {
             error!("Daemon task ended unexpectedly");
         }
-        _ = api_handle => {
+        _ = &mut api_handle => {
             error!("API server ended unexpectedly");
         }
         _ = tokio::signal::ctrl_c() => {
-            info!("Shutdown signal received");
+            info!("Shutdown signal received, stopping...");
+            // Reset SIGINT to default so next Ctrl+C force-kills via OS
+            unsafe { libc::signal(libc::SIGINT, libc::SIG_DFL); }
         }
     }
 
-    info!("Fox Daemon shutting down");
+    let _ = shutdown_tx.send(true);
+    daemon_handle.abort();
+    let _ = api_handle.await;
+
+    info!("foxd stopped");
     Ok(())
 }
 
@@ -125,6 +143,8 @@ fn default_config() -> Config {
             capture_filter: None,
             neighbor_check_interval_secs: 30,
             device_timeout_secs: 60,
+            log_cleanup_enabled: true,
+            log_retention_days: 30,
         },
         database: models::DatabaseConfig {
             path: std::env::var("FOXD_DB_PATH").unwrap_or_else(|_| "./foxd.db".to_string()),

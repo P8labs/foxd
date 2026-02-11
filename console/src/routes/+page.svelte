@@ -17,7 +17,6 @@
   let error = $state("");
   let success = $state("");
   let healthStatus = $state<HealthResponse | null>(null);
-  let restarting = $state(false);
 
   async function loadData() {
     try {
@@ -37,22 +36,6 @@
       error = err instanceof Error ? err.message : "Failed to load data";
     } finally {
       loading = false;
-    }
-  }
-
-  async function handleRestart() {
-    if (!confirm("Are you sure you want to restart the daemon?")) return;
-
-    try {
-      restarting = true;
-      error = "";
-      await api.restartDaemon();
-      success = "Daemon restart initiated successfully";
-      setTimeout(() => (success = ""), 3000);
-    } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to restart daemon";
-    } finally {
-      restarting = false;
     }
   }
 
@@ -79,13 +62,6 @@
         <span>System Online</span>
       </div>
     {/if}
-    <button
-      class="btn btn-primary"
-      onclick={handleRestart}
-      disabled={restarting}
-    >
-      {restarting ? "Restarting..." : "Restart Daemon"}
-    </button>
   </div>
 </div>
 
@@ -136,8 +112,9 @@
             <div class="progress-bar" style="flex: 1;">
               <div
                 class="progress-fill"
-                style="width: {healthStatus.system.cpu_usage_percent}%; background-color: {healthStatus
-                  .system.cpu_usage_percent > 80
+                style="width: {healthStatus.system
+                  .cpu_usage_percent}%; background-color: {healthStatus.system
+                  .cpu_usage_percent > 80
                   ? 'var(--danger)'
                   : 'var(--success)'};"
               ></div>
@@ -155,7 +132,8 @@
             <div class="progress-bar" style="flex: 1;">
               <div
                 class="progress-fill"
-                style="width: {healthStatus.system.memory_usage_percent}%; background-color: {healthStatus
+                style="width: {healthStatus.system
+                  .memory_usage_percent}%; background-color: {healthStatus
                   .system.memory_usage_percent > 80
                   ? 'var(--danger)'
                   : 'var(--success)'};"

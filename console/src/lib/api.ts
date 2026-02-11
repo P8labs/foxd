@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.API_URL || "http://localhost:8080";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 export interface Device {
   id: number;
@@ -85,6 +85,8 @@ export interface Config {
     neighbor_check_interval_secs: number;
     device_timeout_secs: number;
     capture_filter: string | null;
+    log_cleanup_enabled: boolean;
+    log_retention_days: number;
   };
   api: {
     host: string;
@@ -106,6 +108,20 @@ export interface HealthResponse {
     total_memory_mb: number;
     used_memory_mb: number;
   };
+}
+
+export interface LogEntry {
+  id: number;
+  timestamp: string;
+  level: "info" | "warning" | "error" | "debug";
+  category: string;
+  message: string;
+  details: string | null;
+}
+
+export interface LogsResponse {
+  logs: LogEntry[];
+  count: number;
 }
 
 class ApiClient {
@@ -207,6 +223,10 @@ class ApiClient {
     await this.request<{ message: string }>("/restart", {
       method: "POST",
     });
+  }
+
+  async getLogs(): Promise<LogsResponse> {
+    return this.request<LogsResponse>("/logs");
   }
 }
 

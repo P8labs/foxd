@@ -14,6 +14,13 @@ neighbor_check_interval_secs = 60
 # How long before marking a device as offline (seconds)
 device_timeout_secs = 300
 
+# Enable automatic log cleanup (true/false)
+log_cleanup_enabled = true
+
+# How many days to keep logs before deleting them
+# Logs older than this will be automatically deleted daily
+log_retention_days = 30
+
 [database]
 # SQLite database file path
 path = "./foxd.db"
