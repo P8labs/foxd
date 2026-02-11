@@ -2,8 +2,10 @@
 
 ## Requirements
 
-- Linux (foxd uses netlink and libpcap, which are Linux-specific)
-- `libpcap-dev` installed on the system
+**Linux:**
+
+- Linux OS (uses netlink for neighbor table monitoring)
+- `libpcap` installed on the system
 - Root or `CAP_NET_RAW` / `CAP_NET_ADMIN` capabilities for packet capture
 
 ## Install from Binary

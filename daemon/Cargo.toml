@@ -1,7 +1,7 @@
 [package]
 name = "foxd-daemon"
 version = "1.0.0"
-edition = "2021"
+edition = "2024"
 authors = ["P8labs"]
 description = "LAN monitoring daemon with packet capture, notifications, and built-in web console"
 
@@ -14,20 +14,26 @@ name = "foxd"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1.35", features = ["full"] }
+
+tokio = { version = "1.37", features = ["fs","signal", "rt-multi-thread"] }
 tokio-util = "0.7"
 
 axum = { version = "0.7", features = ["macros"] }
-tower = "0.4"
+tower = "0.5"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 toml = "0.8"
 
-sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "sqlite", "macros", "migrate"] }
+sqlx = { version = "0.7", features = [
+    "runtime-tokio-rustls",
+    "sqlite",
+    "macros",
+    "migrate"
+] }
 
-pcap = "1.1"
+pcap = "1.2"
 pnet = { version = "0.34", features = ["std"] }
 
 rtnetlink = "0.14"
@@ -35,22 +41,26 @@ netlink-packet-route = "0.19"
 futures = "0.3"
 libc = "0.2"
 
-reqwest = { version = "0.12", features = ["json"], default-features = false }
-openssl = { version = "0.10", optional = true }
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "rustls-tls"
+] }
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-log = "0.2"
 
-anyhow = "1.0"
-thiserror = "1.0"
+anyhow = "1"
+thiserror = "1"
 
+# Time
 chrono = { version = "0.4", features = ["serde"] }
 
 sysinfo = "0.30"
 
 config = "0.14"
 
-async-channel = "2.1"
+async-channel = "2"
 
 ipnetwork = "0.20"
 mac_address = "1.1"
@@ -58,16 +68,13 @@ mac_address = "1.1"
 rust-embed = "8"
 mime_guess = "2"
 
-[features]
-default = ["native-tls"]
-native-tls = ["reqwest/native-tls"]
-vendored-openssl = ["openssl/vendored", "reqwest/native-tls-vendored"]
-
 [dev-dependencies]
-mockito = "1.2"
-tempfile = "3.8"
+mockito = "1.6"
+tempfile = "3"
 
 [profile.release]
 opt-level = 3
-lto = true
+lto = "fat"
 codegen-units = 1
+panic = "abort"
+strip = true

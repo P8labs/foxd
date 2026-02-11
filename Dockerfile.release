@@ -1,0 +1,108 @@
+FROM node:22-alpine AS console-builder
+
+WORKDIR /build/console
+
+COPY console/package.json console/pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
+
+COPY console/ ./
+RUN pnpm build
+
+FROM ghcr.io/rust-cross/cargo-zigbuild:latest AS builder
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    wget \
+    pkg-config \
+    ca-certificates \
+    flex \
+    bison \
+ && rm -rf /var/lib/apt/lists/*
+
+
+WORKDIR /tmp
+
+RUN wget https://www.tcpdump.org/release/libpcap-1.10.4.tar.gz \
+ && tar xf libpcap-1.10.4.tar.gz 
+
+
+
+ENV PKG_CONFIG_ALL_STATIC=1
+
+SHELL ["/bin/bash", "-c"]
+
+
+RUN cd /tmp/libpcap-1.10.4 \
+ && make distclean || true \
+ && CC="zig cc -target x86_64-linux-musl" \
+    ./configure \
+      --host=x86_64-linux-musl \
+      --disable-shared \
+      --without-dbus \
+      --without-libnl \
+      --disable-bluetooth \
+      --prefix=/opt/libpcap/x86_64 \
+ && make -j$(nproc) \
+ && make install
+
+
+RUN cd /tmp/libpcap-1.10.4 \
+ && make distclean || true \
+ && CC="zig cc -target aarch64-linux-musl" \
+    ./configure --disable-shared --host=aarch64-linux-musl --enable-static --prefix=/opt/libpcap/aarch64 \
+ && make -j$(nproc) \
+ && make install
+
+
+RUN cd /tmp/libpcap-1.10.4 \
+ && make distclean || true \
+ && CC="zig cc -target arm-linux-musleabihf" \
+    ./configure --disable-shared --enable-static --prefix=/opt/libpcap/armv7 --host=arm-linux-musleabihf \
+ && make -j$(nproc) \
+ && make install
+
+
+WORKDIR /build
+
+COPY daemon/Cargo.toml daemon/Cargo.lock ./daemon/
+WORKDIR /build/daemon
+
+RUN mkdir src && echo "fn main(){}" > src/main.rs
+
+ENV ac_cv_func_malloc_0_nonnull=yes
+
+ENV PKG_CONFIG_SYSROOT_DIR=/
+
+
+ENV PKG_CONFIG_PATH=/opt/libpcap/x86_64/lib/pkgconfig
+RUN pkg-config --libs --static libpcap
+RUN cargo zigbuild --release --target x86_64-unknown-linux-musl || true
+
+
+COPY daemon/ ./
+COPY --from=console-builder /build/console/build ./console/build
+
+RUN mkdir /out
+
+
+ENV PKG_CONFIG_PATH=/opt/libpcap/x86_64/lib/pkgconfig
+RUN pkg-config --libs --static libpcap
+RUN cargo zigbuild --release --target x86_64-unknown-linux-musl \
+ && cp target/x86_64-unknown-linux-musl/release/foxd /out/foxd-linux-amd64
+
+
+RUN rustup target add aarch64-unknown-linux-musl
+ENV PKG_CONFIG_PATH=/opt/libpcap/aarch64/lib/pkgconfig
+RUN cargo zigbuild --release --target aarch64-unknown-linux-musl \
+&& cp target/aarch64-unknown-linux-musl/release/foxd /out/foxd-linux-arm64
+
+
+RUN rustup target add armv7-unknown-linux-musleabihf
+ENV PKG_CONFIG_PATH=/opt/libpcap/armv7/lib/pkgconfig
+RUN cargo zigbuild --release --target armv7-unknown-linux-musleabihf \
+&& cp target/armv7-unknown-linux-musleabihf/release/foxd /out/foxd-linux-armv7
+
+
+FROM scratch
+
+COPY --from=builder /out /

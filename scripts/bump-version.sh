@@ -80,7 +80,7 @@ show_info() {
     echo -e "${BLUE}═══════════════════════════════════════════════════${NC}"
     echo -e "${YELLOW}Version:${NC}     $version"
     echo -e "${YELLOW}Binary:${NC}      foxd"
-    echo -e "${YELLOW}Platform:${NC}    Linux (x86_64, ARM64, ARMv7)"
+    echo -e "${YELLOW}Platform:${NC}    Linux (x86_64, ARM64, ARMv7), Windows (x86_64)"
     echo -e "${YELLOW}Language:${NC}    Rust"
     echo -e "${YELLOW}Console:${NC}     SvelteKit"
     echo -e "${BLUE}═══════════════════════════════════════════════════${NC}\n"

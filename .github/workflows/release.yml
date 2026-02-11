@@ -1,4 +1,4 @@
-name: Release
+name: Release Foxd Binaries
 
 on:
   push:
@@ -15,80 +15,27 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            artifact: foxd-linux-amd64
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            artifact: foxd-linux-arm64
-          - target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
-            artifact: foxd-linux-armv7
-
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: console/pnpm-lock.yaml
-
-      - name: Build console
-        working-directory: console
+      - name: Build release artifacts
         run: |
-          pnpm install 
-          pnpm build
+          docker buildx build \
+            --file Dockerfile.release \
+            --output type=local,dest=release \
+            .
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+          chmod +x release/foxd-* || true
+          ls -lh release
+
+      - uses: actions/upload-artifact@v4
         with:
-          targets: ${{ matrix.target }}
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: daemon
-          key: ${{ matrix.target }}
-
-      - name: Install cross
-        if: matrix.target != 'x86_64-unknown-linux-gnu'
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-
-      - name: Install build deps (Linux native)
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
-        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
-
-      - name: Build (Linux native)
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
-        working-directory: daemon
-        run: cargo build --release --target ${{ matrix.target }} --features vendored-openssl
-
-      - name: Build (cross)
-        if: matrix.target != 'x86_64-unknown-linux-gnu'
-        working-directory: daemon
-        run: cross build --release --target ${{ matrix.target }} --features vendored-openssl
-
-      - name: Rename binary
-        run: cp daemon/target/${{ matrix.target }}/release/foxd ${{ matrix.artifact }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}
+          name: foxd-binaries
+          path: release/*
 
   release:
     needs: build
@@ -97,7 +44,8 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          merge-multiple: true
+          name: foxd-binaries
+          path: .
 
       - name: Determine version
         id: version
@@ -125,11 +73,15 @@ jobs:
             - **Linux ARMv7** (32-bit ARM - Raspberry Pi 2/3)
 
             ### Requirements
-            - Linux (uses netlink and libpcap APIs)
+
+            **Linux:**
             - Root privileges or `CAP_NET_RAW` + `CAP_NET_ADMIN` capabilities
             - `libpcap` installed on the system
+            - Uses netlink APIs for neighbor table monitoring
 
             ### Installation
+
+            **Linux:**
             ```bash
             # Download for your platform
             curl -L -o foxd https://github.com/P8labs/foxd/releases/latest/download/foxd-linux-amd64
@@ -140,4 +92,4 @@ jobs:
             See the [documentation](https://p8labs.github.io/foxd) for complete setup instructions.
           generate_release_notes: true
           make_latest: true
-          files: foxd-*
+          files: "*"
