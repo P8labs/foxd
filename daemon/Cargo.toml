@@ -1,13 +1,9 @@
 [package]
-name = "foxd-daemon"
+name = "foxd"
 version = "1.1.1"
 edition = "2024"
 authors = ["P8labs"]
 description = "LAN monitoring daemon with packet capture, notifications, and built-in web console"
-
-[lib]
-name = "foxd_daemon"
-path = "src/lib.rs"
 
 [[bin]]
 name = "foxd"
@@ -38,6 +34,8 @@ pnet = { version = "0.34", features = ["std"] }
 
 rtnetlink = "0.14"
 netlink-packet-route = "0.19"
+netlink-packet-core = "0.7"
+netlink-sys = "0.8"
 futures = "0.3"
 libc = "0.2"
 

@@ -1,9 +1,9 @@
 use async_channel::{Receiver, Sender};
 use chrono::Utc;
 use pcap::{Capture, Device as PcapDevice};
+use pnet::packet::Packet;
 use pnet::packet::arp::ArpPacket;
 use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
-use pnet::packet::Packet;
 use rtnetlink::new_connection;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -280,7 +280,6 @@ impl Daemon {
                 .unwrap_or_else(|| "no IP".to_string())
         );
 
-        // Log device activity
         if is_new {
             let log_entry = crate::models::LogEntry {
                 id: None,
