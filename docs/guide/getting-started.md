@@ -10,11 +10,11 @@
 
 ## Install from Binary
 
-Download the latest release for your platform from the [releases page](https://github.com/p8labs/foxd/releases).
+Download the mirrored release binaries from the docs site. The docs build copies the latest release assets into the Pages artifact, so installs keep working even if the repository is private.
 
 ```bash
 # Example for Linux x86_64
-curl -L -o foxd https://github.com/p8labs/foxd/releases/latest/download/foxd-linux-amd64
+curl -L -o foxd https://p8labs.github.io/foxd/downloads/latest/foxd-linux-amd64
 chmod +x
 sudo setcap cap_net_raw,cap_net_admin=eip ./foxd
 sudo mv foxd /usr/local/bin/
