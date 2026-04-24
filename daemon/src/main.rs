@@ -62,10 +62,15 @@ async fn main() -> Result<()> {
         notification_channels.len()
     );
 
+    let interface = if config.daemon.interface == "auto" {
+        detect_default_interface()?
+    } else {
+        config.daemon.interface.clone()
+    };
     let daemon = Arc::new(Daemon::new(
         db.clone(),
         notifier,
-        config.daemon.interface.clone(),
+        interface,
         config.daemon.device_timeout_secs,
         config.daemon.neighbor_check_interval_secs,
         config.daemon.log_cleanup_enabled,
@@ -198,4 +203,25 @@ fn default_config() -> Config {
                 .unwrap_or(8080),
         },
     }
+}
+
+fn detect_default_interface() -> Result<String> {
+    use std::process::Command;
+
+    let output = Command::new("ip").args(["route", "get", "1"]).output()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for part in stdout.split_whitespace() {
+        if part == "dev" {
+            return stdout
+                .split_whitespace()
+                .skip_while(|&x| x != "dev")
+                .nth(1)
+                .map(|s| s.to_string())
+                .ok_or_else(|| DaemonError::Config("Failed to detect interface".into()));
+        }
+    }
+
+    Err(DaemonError::Config("No default interface found".into()))
 }

@@ -28,6 +28,64 @@ The installer will:
 
 ---
 
+## Run with Docker (Quick Setup)
+
+Foxd is available as a prebuilt multi-arch Docker image on **GHCR**.
+
+### Quick start
+
+```bash
+docker run -d \
+  --name foxd \
+  --network host \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  ghcr.io/p8labs/foxd:latest
+```
+
+---
+
+### Why these flags are required
+
+- `--network host` → allows foxd to see real LAN traffic (not container-only network)
+- `NET_RAW` → required for packet capture (libpcap)
+- `NET_ADMIN` → required for netlink + interface monitoring
+
+Without these, foxd will not function correctly.
+
+---
+
+### Use a specific version
+
+```bash
+docker run -d \
+  --network host \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  ghcr.io/p8labs/foxd:v1.1.2
+```
+
+---
+
+### Persist configuration (recommended)
+
+```bash
+docker run -d \
+  --name foxd \
+  --network host \
+  --cap-add NET_RAW \
+  --cap-add NET_ADMIN \
+  -v /etc/foxd:/etc/foxd \
+  ghcr.io/p8labs/foxd:latest
+```
+
+---
+
+### Notes
+
+- The container runs as a non-root user but still requires Linux capabilities.
+- API will be available on the host at `http://<host>:3090`.
+
 ## Install from Binary
 
 Download the latest release binaries from the github [releases](https://github.com/P8labs/foxd/releases).
