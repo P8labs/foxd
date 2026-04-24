@@ -10,53 +10,85 @@ on:
         description: "Version to release (e.g., 1.2.3)"
         required: true
         type: string
+
 permissions:
   contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            arch: amd64
+          - target: aarch64-unknown-linux-musl
+            arch: arm64
+          - target: armv7-unknown-linux-musleabihf
+            arch: armv7
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
-
-      - name: Build release artifacts
-        run: |
-          docker buildx build \
-            --file Dockerfile.release \
-            --output type=local,dest=release \
-            .
-
-          chmod +x release/foxd-* || true
-          ls -lh release
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: foxd-binaries
-          path: release/*
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: foxd-binaries
-          path: .
 
       - name: Determine version
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            VERSION="v${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build ${{ matrix.arch }}
+        run: |
+          mkdir -p release
+
+          docker buildx build \
+            --file Dockerfile.release \
+            --build-arg TARGET=${{ matrix.target }} \
+            --output type=local,dest=release \
+            .
+
+          BIN_NAME="foxd-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}"
+          mv release/foxd release/$BIN_NAME
+          chmod +x release/$BIN_NAME
+
+          sha256sum release/$BIN_NAME > release/$BIN_NAME.sha256
+
+          ls -lh release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: foxd-${{ matrix.arch }}
+          path: release/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
             echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p final
+          find release -type f -exec cp {} final/ \;
+          ls -lh final
 
       - name: Create release
         uses: softprops/action-gh-release@v2
@@ -75,22 +107,16 @@ jobs:
             ### Requirements
 
             **Linux:**
-            - Root privileges or `CAP_NET_RAW` + `CAP_NET_ADMIN` capabilities
-            - `libpcap` installed on the system
-            - Uses netlink APIs for neighbor table monitoring
+            - Root privileges or `CAP_NET_RAW` + `CAP_NET_ADMIN`
+            - `libpcap` installed
+            - Uses netlink APIs
 
             ### Installation
 
-            **Linux:**
             ```bash
-            # Download for your platform
-            curl -L -o foxd https://p8labs.github.io/foxd/downloads/latest/foxd-linux-amd64
-            chmod +x foxd
-            sudo setcap cap_net_raw,cap_net_admin=eip foxd
-            sudo mv foxd /usr/local/bin/
+            curl -fsSL https://foxd.p8labs.in/install.sh | sudo bash
             ```
 
-            See the [documentation](https://p8labs.github.io/foxd) for complete setup instructions.
           generate_release_notes: true
           make_latest: true
-          files: "*"
+          files: final/*

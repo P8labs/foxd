@@ -150,8 +150,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Format a bind address as a browser-friendly URL, handling the IPv6 case
-/// where the address must be wrapped in square brackets.
 fn format_web_url(addr: &SocketAddr) -> String {
     match addr {
         SocketAddr::V4(a) if a.ip().is_unspecified() => {

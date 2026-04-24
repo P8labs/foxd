@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+GITHUB_REPO="p8labs/foxd"
+BINARY_NAME="foxd"
+INSTALL_DIR="/usr/local/bin"
+BINARY_PATH="$INSTALL_DIR/$BINARY_NAME"
+
+TMP_DIR=""
+
+log() {
+  echo -e "\033[1;34m[foxd]\033[0m $1"
+}
+
+error() {
+  echo -e "\033[1;31mError:\033[0m $1"
+  exit 1
+}
+
+cleanup() {
+  if [ -n "${TMP_DIR:-}" ] && [ -d "$TMP_DIR" ]; then
+    rm -rf "$TMP_DIR"
+  fi
+}
+
+trap 'error "Upgrade failed at line $LINENO. Aborting."' ERR
+trap cleanup EXIT
+
+require_root() {
+  if [ "$EUID" -ne 0 ]; then
+    error "Please run as root (use sudo)."
+  fi
+}
+
+check_installed() {
+  [ -f "$BINARY_PATH" ] || error "foxd not found at $BINARY_PATH"
+}
+
+check_dependencies() {
+  for cmd in curl sha256sum systemctl; do
+    command -v $cmd >/dev/null 2>&1 || error "Missing dependency: $cmd"
+  done
+}
+
+detect_arch() {
+  ARCH=$(uname -m)
+  case "$ARCH" in
+    x86_64) ARCH="amd64" ;;
+    aarch64 | arm64) ARCH="arm64" ;;
+    armv7l) ARCH="armv7" ;;
+    *) error "Unsupported architecture: $ARCH" ;;
+  esac
+}
+
+get_current_version() {
+  CURRENT_VERSION=$("$BINARY_PATH" --version 2>/dev/null | awk '{print $2}' || true)
+
+  if [ -z "${CURRENT_VERSION:-}" ]; then
+    log "Could not determine current version."
+    CURRENT_VERSION="unknown"
+  fi
+
+  log "Current version: $CURRENT_VERSION"
+}
+
+fetch_latest_version() {
+  log "Fetching latest release..."
+
+  LATEST_VERSION=$(curl -fsSL "https://api.github.com/repos/$GITHUB_REPO/releases/latest" \
+    | grep '"tag_name":' \
+    | sed -E 's/.*"([^"]+)".*/\1/')
+
+  [ -n "$LATEST_VERSION" ] || error "Could not determine latest version."
+
+  log "Latest version: $LATEST_VERSION"
+}
+
+compare_versions() {
+  if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+    log "foxd is already up to date."
+    exit 0
+  fi
+}
+
+download_and_verify() {
+  ASSET="${BINARY_NAME}-${LATEST_VERSION}-linux-${ARCH}"
+  BASE_URL="https://github.com/${GITHUB_REPO}/releases/download/${LATEST_VERSION}"
+  BINARY_URL="${BASE_URL}/${ASSET}"
+  CHECKSUM_URL="${BASE_URL}/${ASSET}.sha256"
+
+  log "Downloading new binary..."
+  TMP_DIR=$(mktemp -d)
+
+  curl -fL "$BINARY_URL" -o "$TMP_DIR/$ASSET" || error "Binary download failed."
+
+  log "Attempting checksum verification..."
+
+  if curl -fsL "$CHECKSUM_URL" -o "$TMP_DIR/$ASSET.sha256"; then
+    cd "$TMP_DIR"
+
+    EXPECTED_SUM=$(awk '{print $1}' "$ASSET.sha256")
+    ACTUAL_SUM=$(sha256sum "$ASSET" | awk '{print $1}')
+
+    if [ "$EXPECTED_SUM" != "$ACTUAL_SUM" ]; then
+      error "Checksum mismatch. Aborting upgrade."
+    fi
+
+    log "Checksum verified."
+  else
+    log "No checksum file found. Skipping verification."
+  fi
+
+  mv "$TMP_DIR/$ASSET" "$BINARY_PATH"
+  chmod +x "$BINARY_PATH"
+
+  log "Binary replaced successfully."
+}
+
+restart_service() {
+  log "Restarting foxd..."
+
+  if systemctl is-active --quiet foxd; then
+    systemctl restart foxd
+  else
+    systemctl start foxd
+  fi
+
+  if systemctl is-active --quiet foxd; then
+    log "foxd is running."
+  else
+    error "foxd failed to start after upgrade."
+  fi
+}
+
+
+require_root
+check_dependencies
+check_installed
+detect_arch
+get_current_version
+fetch_latest_version
+compare_versions
+download_and_verify
+restart_service
+
+log "Upgrade complete."

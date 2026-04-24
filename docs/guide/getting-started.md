@@ -8,25 +8,37 @@
 - `libpcap` installed on the system
 - Root or `CAP_NET_RAW` / `CAP_NET_ADMIN` capabilities for packet capture
 
-## Install from Binary
+## Install Foxd
 
-Download the mirrored release binaries from the docs site. The docs build copies the latest release assets into the Pages artifact, so installs keep working even if the repository is private.
+Install using the official script:
 
 ```bash
-# Example for Linux x86_64
-curl -L -o foxd https://p8labs.github.io/foxd/downloads/latest/foxd-linux-amd64
+curl -fsSL https://foxd.p8labs.in/install.sh | sudo bash
+```
+
+The installer will:
+
+- Detect your system architecture
+- Download the latest release from GitHub
+- Install the binary to `/usr/local/bin/foxd`
+- Create `/etc/foxd/`
+- Generate a default configuration
+- Create and enable a systemd service
+- Start foxd automatically
+
+---
+
+## Install from Binary
+
+Download the latest release binaries from the github [releases](https://github.com/P8labs/foxd/releases).
+
+```bash
+# Example for Linux
+curl -L -o foxd https://github.com/P8labs/foxd/releases/download/latest/foxd-v1.1.2-linux-amd64
 chmod +x
 sudo setcap cap_net_raw,cap_net_admin=eip ./foxd
 sudo mv foxd /usr/local/bin/
 ```
-
-Available binaries:
-
-| Platform                   | File               |
-| -------------------------- | ------------------ |
-| Linux x86_64               | `foxd-linux-amd64` |
-| Linux ARM64                | `foxd-linux-arm64` |
-| Linux ARMv7 (Raspberry Pi) | `foxd-linux-armv7` |
 
 ## Build from Source
 
