@@ -95,7 +95,7 @@ jobs:
 
       - name: Build & Push (per arch)
         run: |
-          IMAGE=ghcr.io/${{ github.repository_owner }}/foxd
+          IMAGE=ghcr.io/p8labs/foxd
           TAG=${{ steps.version.outputs.tag }}
 
           docker buildx build \
