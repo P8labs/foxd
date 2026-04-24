@@ -5,6 +5,7 @@ on:
     workflows: ["Release Foxd Binaries"]
     types:
       - completed
+
   workflow_dispatch:
     inputs:
       version:
@@ -32,24 +33,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download binaries
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
       - name: Determine version
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="v${{ github.event.inputs.version }}"
           else
-            TAG="${GITHUB_REF#refs/tags/}"
+            TAG="${{ github.event.workflow_run.head_branch }}"
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Download artifacts from triggering workflow
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: Release Foxd Binaries
+          run_id: ${{ github.event.workflow_run.id }}
+          path: artifacts
+
+      - name: Download latest artifacts (manual fallback)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: Release Foxd Binaries
+          workflow_conclusion: success
+          branch: main
+          path: artifacts
+
+      - name: Validate artifacts
+        run: |
+          if [ -z "$(find artifacts -type f 2>/dev/null)" ]; then
+            echo "No artifacts found. Did binary build run?"
+            exit 1
+          fi
 
       - name: Prepare binary
         run: |
           BIN=$(find artifacts -name "*linux-${{ matrix.arch }}" | head -n1)
+          if [ -z "$BIN" ]; then
+            echo "Binary for ${{ matrix.arch }} not found"
+            exit 1
+          fi
+
           cp "$BIN" foxd
           chmod +x foxd
 
@@ -62,7 +87,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push (per arch)
+      - name: Build & Push
         run: |
           IMAGE=ghcr.io/${{ github.repository_owner }}/foxd
 
@@ -73,30 +98,3 @@ jobs:
             -t $IMAGE:latest-${{ matrix.arch }} \
             --push \
             .
-  manifest:
-    needs: docker
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Login
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create multi-arch manifest
-        run: |
-          IMAGE=ghcr.io/${{ github.repository_owner }}/foxd
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="v${{ github.event.inputs.version }}"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-          fi
-
-          docker buildx imagetools create \
-            -t $IMAGE:$TAG \
-            -t $IMAGE:latest \
-            $IMAGE:$TAG-amd64 \
-            $IMAGE:$TAG-arm64
