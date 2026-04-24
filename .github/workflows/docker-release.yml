@@ -141,7 +141,7 @@ jobs:
 
       - name: Create multi-arch manifest
         run: |
-          IMAGE=ghcr.io/${{ github.repository_owner }}/foxd
+          IMAGE=ghcr.io/p8labs/foxd
           TAG=${{ steps.version.outputs.tag }}
 
           echo "Creating manifest for $TAG"
