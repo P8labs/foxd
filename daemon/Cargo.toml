@@ -1,6 +1,6 @@
 [package]
 name = "foxd"
-version = "1.2.2"
+version = "1.2.3"
 edition = "2024"
 authors = ["P8labs"]
 description = "LAN monitoring daemon with packet capture, notifications, and built-in web console"
