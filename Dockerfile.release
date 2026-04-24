@@ -34,9 +34,10 @@ ENV PKG_CONFIG_SYSROOT_DIR=/
 
 SHELL ["/bin/bash", "-c"]
 
+
 RUN cd /tmp/libpcap-1.10.4 \
    && make clean || true \
-   && export ZIG_TARGET=$(echo ${TARGET} | sed 's/-unknown//') \
+   && export ZIG_TARGET=$(echo ${TARGET} | sed -e 's/-unknown//' -e 's/armv7/arm/') \
    && CC="zig cc -target ${ZIG_TARGET}" \
    CFLAGS="-O2" \
    LDFLAGS="" \
