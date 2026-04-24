@@ -185,7 +185,7 @@ fn load_config() -> Result<Config> {
 fn default_config() -> Config {
     Config {
         daemon: models::DaemonConfig {
-            interface: std::env::var("INTERFACE").unwrap_or_else(|_| "wlan0".to_string()),
+            interface: std::env::var("INTERFACE").unwrap_or_else(|_| "auto".to_string()),
             capture_filter: None,
             neighbor_check_interval_secs: 30,
             device_timeout_secs: 60,
