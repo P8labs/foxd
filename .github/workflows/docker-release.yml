@@ -71,7 +71,7 @@ jobs:
         run: |
           echo "Verifying checksum..."
 
-          EXPECTED=$(cat foxd.sha256 | tr -d ' \n')
+          EXPECTED=$(awk '{print $1}' foxd.sha256)
           ACTUAL=$(sha256sum foxd | awk '{print $1}')
 
           echo "Expected: $EXPECTED"
