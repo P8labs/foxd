@@ -60,34 +60,29 @@ Foxd is available as a multi-arch image on GHCR.
 ### Quick start
 
 ```bash
+mkdir -p ~/foxd-data
+
 docker run -d \
   --name foxd \
   --network host \
   --cap-add NET_RAW \
   --cap-add NET_ADMIN \
+  -v ~/foxd-data:/data \
+  -e DB_PATH=/data/foxd.db \
   ghcr.io/p8labs/foxd:latest
 ```
 
 ### Use a specific version
 
 ```bash
+mkdir -p ~/foxd-data
 docker run -d \
   --network host \
   --cap-add NET_RAW \
   --cap-add NET_ADMIN \
+  -v ~/foxd-data:/data \
+  -e DB_PATH=/data/foxd.db \
   ghcr.io/p8labs/foxd:v1.2.1
-```
-
-### Persist config (recommended)
-
-```bash
-docker run -d \
-  --name foxd \
-  --network host \
-  --cap-add NET_RAW \
-  --cap-add NET_ADMIN \
-  -v /etc/foxd:/etc/foxd \
-  ghcr.io/p8labs/foxd:latest
 ```
 
 ## Docker Configuration

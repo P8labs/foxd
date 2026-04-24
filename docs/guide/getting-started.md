@@ -26,8 +26,6 @@ The installer will:
 - Create and enable a systemd service
 - Start foxd automatically
 
----
-
 ## Run with Docker (Quick Setup)
 
 Foxd is available as a prebuilt multi-arch Docker image on **GHCR**.
@@ -35,15 +33,17 @@ Foxd is available as a prebuilt multi-arch Docker image on **GHCR**.
 ### Quick start
 
 ```bash
+mkdir -p ~/foxd-data
+
 docker run -d \
   --name foxd \
   --network host \
   --cap-add NET_RAW \
   --cap-add NET_ADMIN \
+  -v ~/foxd-data:/data \
+  -e DB_PATH=/data/foxd.db \
   ghcr.io/p8labs/foxd:latest
 ```
-
----
 
 ### Why these flags are required
 
@@ -53,33 +53,20 @@ docker run -d \
 
 Without these, foxd will not function correctly.
 
----
-
 ### Use a specific version
 
 ```bash
-docker run -d \
-  --network host \
-  --cap-add NET_RAW \
-  --cap-add NET_ADMIN \
-  ghcr.io/p8labs/foxd:v1.1.2
-```
+mkdir -p ~/foxd-data
 
----
-
-### Persist configuration (recommended)
-
-```bash
 docker run -d \
   --name foxd \
   --network host \
   --cap-add NET_RAW \
   --cap-add NET_ADMIN \
-  -v /etc/foxd:/etc/foxd \
-  ghcr.io/p8labs/foxd:latest
+  -v ~/foxd-data:/data \
+  -e DB_PATH=/data/foxd.db \
+  ghcr.io/p8labs/foxd:v1.2.1
 ```
-
----
 
 ### Notes
 
