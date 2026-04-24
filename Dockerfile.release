@@ -56,6 +56,7 @@ COPY daemon/Cargo.toml ./daemon/
 WORKDIR /build/daemon
 
 RUN mkdir src && echo "fn main(){}" > src/main.rs
+RUN rustup target add ${TARGET}
 RUN cargo zigbuild --release --target ${TARGET} || true
 
 # Real build
