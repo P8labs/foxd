@@ -57,7 +57,7 @@ jobs:
         with:
           workflow: Release Foxd Binaries
           workflow_conclusion: success
-          branch: main
+          event: push
           path: artifacts
 
       - name: Validate artifacts
