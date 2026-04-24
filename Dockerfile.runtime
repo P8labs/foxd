@@ -1,7 +1,7 @@
 FROM alpine:3.20
 
 RUN apk add --no-cache \
-    libpcap \
+    libpcap libcap \
     ca-certificates
 
 RUN adduser -D -H foxd
@@ -10,10 +10,9 @@ WORKDIR /app
 
 COPY foxd /usr/local/bin/foxd
 
-RUN chmod +x /usr/local/bin/foxd
+RUN chmod +x /usr/local/bin/foxd \
+    && setcap cap_net_raw,cap_net_admin=eip /usr/local/bin/foxd
 
 USER foxd
-
-EXPOSE 3090
 
 ENTRYPOINT ["foxd"]
