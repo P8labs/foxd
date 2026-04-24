@@ -35,15 +35,14 @@ ENV PKG_CONFIG_SYSROOT_DIR=/
 SHELL ["/bin/bash", "-c"]
 
 RUN cd /tmp/libpcap-1.10.4 \
-   && make distclean || true \
-   && CC="zig cc -target ${TARGET}" \
+   && make clean || true \
+   && export ZIG_TARGET=$(echo ${TARGET} | sed 's/-unknown//') \
+   && CC="zig cc -target ${ZIG_TARGET}" \
+   CFLAGS="-O2" \
+   LDFLAGS="" \
    ./configure \
-   --host=${TARGET} \
+   --host=${ZIG_TARGET} \
    --disable-shared \
-   --enable-static \
-   --without-dbus \
-   --without-libnl \
-   --disable-bluetooth \
    --prefix=/opt/libpcap \
    && make -j$(nproc) \
    && make install
